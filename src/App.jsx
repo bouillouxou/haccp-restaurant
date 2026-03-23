@@ -197,6 +197,55 @@ const css = `
   .tag.green { background: ${theme.accentDim}; color: ${theme.accent}; }
   .tag.red { background: ${theme.dangerDim}; color: ${theme.danger}; }
   .tag.yellow { background: ${theme.warningDim}; color: ${theme.warning}; }
+
+  /* Photo Scan Screen */
+  .scan-container { padding: 0 16px; display: flex; flex-direction: column; gap: 14px; }
+  .camera-zone { background: ${theme.card}; border: 2px dashed ${theme.border}; border-radius: 20px; padding: 36px 20px; display: flex; flex-direction: column; align-items: center; gap: 12px; cursor: pointer; transition: all 0.2s; position: relative; overflow: hidden; }
+  .camera-zone:hover { border-color: ${theme.accent}66; background: ${theme.accentDim}; }
+  .camera-zone.has-image { border-style: solid; border-color: ${theme.accent}44; padding: 0; }
+  .camera-zone img { width: 100%; border-radius: 18px; max-height: 220px; object-fit: cover; display: block; }
+  .camera-icon { font-size: 48px; }
+  .camera-text { font-size: 15px; font-weight: 600; color: ${theme.text}; }
+  .camera-sub { font-size: 12px; color: ${theme.textMuted}; text-align: center; }
+  .camera-input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .camera-badge { position: absolute; top: 10px; right: 10px; background: ${theme.accent}; color: #000; font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 20px; }
+
+  .scan-loading { background: ${theme.card}; border-radius: 16px; padding: 20px; display: flex; align-items: center; gap: 14px; border: 1px solid ${theme.accent}33; }
+  .scan-spinner { width: 32px; height: 32px; border: 3px solid ${theme.border}; border-top-color: ${theme.accent}; border-radius: 50%; animation: spin 0.8s linear infinite; flex-shrink: 0; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .scan-loading-text { font-size: 14px; font-weight: 500; }
+  .scan-loading-sub { font-size: 12px; color: ${theme.textMuted}; margin-top: 2px; }
+
+  .extracted-card { background: ${theme.card}; border: 1px solid ${theme.accent}44; border-radius: 16px; padding: 16px; }
+  .extracted-title { font-size: 12px; font-weight: 600; color: ${theme.accent}; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
+  .extracted-field { display: flex; flex-direction: column; gap: 3px; margin-bottom: 10px; }
+  .extracted-label { font-size: 10px; color: ${theme.textMuted}; text-transform: uppercase; letter-spacing: 0.6px; }
+  .extracted-value { font-size: 14px; font-weight: 500; }
+  .extracted-input { background: transparent; border: none; border-bottom: 1px solid ${theme.border}; color: ${theme.text}; font-family: 'Sora', sans-serif; font-size: 14px; font-weight: 500; width: 100%; outline: none; padding-bottom: 3px; }
+  .extracted-input:focus { border-bottom-color: ${theme.accent}; }
+  .extracted-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .save-btn { background: ${theme.accent}; color: #000; border: none; border-radius: 14px; padding: 16px; font-family: 'Sora', sans-serif; font-size: 15px; font-weight: 700; width: 100%; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.15s; }
+  .save-btn:active { transform: scale(0.98); }
+  .scan-again-btn { background: ${theme.card}; color: ${theme.textMuted}; border: 1px solid ${theme.border}; border-radius: 14px; padding: 14px; font-family: 'Sora', sans-serif; font-size: 14px; width: 100%; cursor: pointer; }
+
+  .labels-table-wrap { background: ${theme.card}; border: 1px solid ${theme.border}; border-radius: 16px; overflow: hidden; }
+  .labels-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .labels-table th { background: ${theme.surface}; color: ${theme.textMuted}; font-size: 10px; text-transform: uppercase; letter-spacing: 0.7px; padding: 10px 12px; text-align: left; font-weight: 600; border-bottom: 1px solid ${theme.border}; }
+  .labels-table td { padding: 10px 12px; border-bottom: 1px solid ${theme.border}22; vertical-align: middle; }
+  .labels-table tr:last-child td { border-bottom: none; }
+  .labels-table tr:hover td { background: ${theme.surface}; }
+  .dlc-badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 10px; font-weight: 600; }
+  .dlc-badge.ok { background: ${theme.accentDim}; color: ${theme.accent}; }
+  .dlc-badge.soon { background: ${theme.warningDim}; color: ${theme.warning}; }
+  .dlc-badge.expired { background: ${theme.dangerDim}; color: ${theme.danger}; }
+
+  .key-banner { background: ${theme.warningDim}; border: 1px solid ${theme.warning}44; border-radius: 14px; padding: 12px 16px; display: flex; align-items: center; gap: 10px; cursor: pointer; }
+  .key-banner-text { font-size: 12px; color: ${theme.warning}; font-weight: 500; flex: 1; }
+  .key-modal-input { background: ${theme.card}; border: 1px solid ${theme.border}; border-radius: 12px; padding: 12px 14px; color: ${theme.text}; font-family: 'JetBrains Mono', monospace; font-size: 13px; width: 100%; outline: none; margin-bottom: 10px; }
+  .key-modal-input:focus { border-color: ${theme.accent}; }
+  .empty-state { text-align: center; padding: 32px 20px; color: ${theme.textMuted}; font-size: 13px; }
+  .empty-icon { font-size: 40px; margin-bottom: 10px; }
+  .scan-error { background: ${theme.dangerDim}; border: 1px solid ${theme.danger}44; border-radius: 14px; padding: 14px 16px; font-size: 13px; color: ${theme.danger}; }
 `;
 
 // ─── DATA ─────────────────────────────────────────────────────────────────────
@@ -310,6 +359,7 @@ function HomeScreen({ temps, tasks, stock, onNavigate }) {
           { id:"stock", icon:"📦", name:"Stocks", count:`${stock.length} produits`, badge: lowStock||0 },
           { id:"trace", icon:"🔍", name:"Traçabilité", count:`${initialTrace.length} lots`, badge: initialTrace.filter(t=>t.status!=="ok").length },
           { id:"label", icon:"🏷️", name:"Étiquetage", count:"Créer étiquette", badge: 0 },
+          { id:"scan", icon:"📷", name:"Scan Photo", count:"Scanner une étiquette", badge: 0 },
         ].map(m => (
           <div key={m.id} className={`module-btn`} onClick={() => onNavigate(m.id)}>
             {m.badge > 0 && <div className="module-badge">{m.badge}</div>}
@@ -545,6 +595,339 @@ function TraceScreen() {
   );
 }
 
+// ─── PHOTO LABEL SCREEN ───────────────────────────────────────────────────────
+
+function dlcStatus(dateStr) {
+  if (!dateStr) return "ok";
+  const parts = dateStr.split("/");
+  if (parts.length !== 3) return "ok";
+  const d = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+  const now = new Date();
+  const diffDays = (d - now) / (1000 * 60 * 60 * 24);
+  if (diffDays < 0) return "expired";
+  if (diffDays <= 2) return "soon";
+  return "ok";
+}
+
+function dlcLabel(status) {
+  if (status === "expired") return "Expiré";
+  if (status === "soon") return "Bientôt";
+  return "OK";
+}
+
+const STORAGE_LABELS = "haccp_scan_labels";
+const STORAGE_KEY = "haccp_api_key";
+
+function PhotoLabelScreen() {
+  const [apiKey, setApiKey] = useState(() => localStorage.getItem(STORAGE_KEY) || "");
+  const [showKeyModal, setShowKeyModal] = useState(false);
+  const [keyInput, setKeyInput] = useState("");
+  const [image, setImage] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [extracted, setExtracted] = useState(null);
+  const [error, setError] = useState(null);
+  const [labels, setLabels] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(STORAGE_LABELS) || "[]"); } catch { return []; }
+  });
+  const [view, setView] = useState("scan"); // "scan" | "table"
+  const fileRef = useState(null);
+
+  const saveKey = () => {
+    localStorage.setItem(STORAGE_KEY, keyInput);
+    setApiKey(keyInput);
+    setShowKeyModal(false);
+  };
+
+  const handleCapture = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setError(null);
+    setExtracted(null);
+    const url = URL.createObjectURL(file);
+    setImage(url);
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const base64 = ev.target.result.split(",")[1];
+      const mediaType = file.type || "image/jpeg";
+      analyzeImage(base64, mediaType);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const analyzeImage = async (base64, mediaType) => {
+    if (!apiKey) { setShowKeyModal(true); return; }
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+          "anthropic-dangerous-direct-browser-access": "true",
+        },
+        body: JSON.stringify({
+          model: "claude-opus-4-6",
+          max_tokens: 1024,
+          messages: [{
+            role: "user",
+            content: [
+              { type: "image", source: { type: "base64", media_type: mediaType, data: base64 } },
+              { type: "text", text: `Analyse cette étiquette alimentaire HACCP. Extrait les informations en JSON uniquement (sans texte autour) :
+{
+  "nom": "nom du produit",
+  "dateFabrication": "date de fabrication au format JJ/MM/AAAA ou null",
+  "dlc": "date limite de consommation au format JJ/MM/AAAA ou null",
+  "lot": "numéro de lot ou null",
+  "allergenes": "liste des allergènes ou null",
+  "responsable": "nom du responsable/chef ou null",
+  "temperature": "température de conservation ou null",
+  "poids": "poids ou quantité ou null"
+}
+Réponds UNIQUEMENT avec le JSON valide, rien d'autre.` }
+            ]
+          }]
+        })
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error?.message || `Erreur API ${res.status}`);
+      }
+      const data = await res.json();
+      const text = data.content[0].text.trim();
+      const json = JSON.parse(text.replace(/```json|```/g, "").trim());
+      setExtracted(json);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateField = (key, val) => setExtracted(prev => ({ ...prev, [key]: val }));
+
+  const saveLabel = () => {
+    if (!extracted) return;
+    const entry = {
+      ...extracted,
+      id: Date.now(),
+      scanDate: new Date().toLocaleDateString("fr-FR"),
+    };
+    const updated = [entry, ...labels];
+    setLabels(updated);
+    localStorage.setItem(STORAGE_LABELS, JSON.stringify(updated));
+    setImage(null);
+    setExtracted(null);
+    setView("table");
+  };
+
+  const deleteLabel = (id) => {
+    const updated = labels.filter(l => l.id !== id);
+    setLabels(updated);
+    localStorage.setItem(STORAGE_LABELS, JSON.stringify(updated));
+  };
+
+  const resetScan = () => { setImage(null); setExtracted(null); setError(null); };
+
+  return (
+    <div className="screen">
+      {/* Tab switcher */}
+      <div style={{ display: "flex", gap: 8, padding: "0 16px 14px" }}>
+        {[["scan", "📷 Scanner"], ["table", `📋 Tableau (${labels.length})`]].map(([id, label]) => (
+          <div key={id} className={`filter-chip ${view === id ? "active" : ""}`} onClick={() => setView(id)} style={{ flex: 1, textAlign: "center" }}>{label}</div>
+        ))}
+      </div>
+
+      {/* API Key banner */}
+      {!apiKey && view === "scan" && (
+        <div style={{ padding: "0 16px 14px" }}>
+          <div className="key-banner" onClick={() => { setKeyInput(""); setShowKeyModal(true); }}>
+            <span style={{ fontSize: 20 }}>🔑</span>
+            <div className="key-banner-text">Configurez votre clé API Anthropic pour activer la lecture automatique des étiquettes</div>
+            <span style={{ color: theme.warning, fontSize: 18 }}>›</span>
+          </div>
+        </div>
+      )}
+      {apiKey && view === "scan" && !image && (
+        <div style={{ padding: "0 16px 14px", display: "flex", justifyContent: "flex-end" }}>
+          <span style={{ fontSize: 11, color: theme.textMuted, cursor: "pointer" }} onClick={() => { setKeyInput(apiKey); setShowKeyModal(true); }}>⚙️ Changer la clé API</span>
+        </div>
+      )}
+
+      {view === "scan" && (
+        <div className="scan-container">
+          {/* Camera zone */}
+          <label className={`camera-zone ${image ? "has-image" : ""}`}>
+            {image ? (
+              <>
+                <img src={image} alt="Étiquette scannée" />
+                {!loading && !extracted && <div className="camera-badge">Analyse...</div>}
+              </>
+            ) : (
+              <>
+                <span className="camera-icon">📷</span>
+                <div className="camera-text">Prendre en photo une étiquette</div>
+                <div className="camera-sub">Appuyez pour ouvrir la caméra ou choisir une photo</div>
+              </>
+            )}
+            <input className="camera-input" type="file" accept="image/*" capture="environment" onChange={handleCapture} />
+          </label>
+
+          {/* Loading */}
+          {loading && (
+            <div className="scan-loading">
+              <div className="scan-spinner" />
+              <div>
+                <div className="scan-loading-text">Analyse en cours...</div>
+                <div className="scan-loading-sub">Claude Vision lit l'étiquette</div>
+              </div>
+            </div>
+          )}
+
+          {/* Error */}
+          {error && (
+            <div className="scan-error">⚠️ {error}</div>
+          )}
+
+          {/* Extracted data */}
+          {extracted && !loading && (
+            <div className="extracted-card">
+              <div className="extracted-title">✅ Données extraites — modifiables</div>
+              <div className="extracted-field">
+                <div className="extracted-label">Nom du produit</div>
+                <input className="extracted-input" value={extracted.nom || ""} onChange={e => updateField("nom", e.target.value)} placeholder="—" />
+              </div>
+              <div className="extracted-grid">
+                <div className="extracted-field">
+                  <div className="extracted-label">Date fabrication</div>
+                  <input className="extracted-input" value={extracted.dateFabrication || ""} onChange={e => updateField("dateFabrication", e.target.value)} placeholder="JJ/MM/AAAA" />
+                </div>
+                <div className="extracted-field">
+                  <div className="extracted-label">DLC</div>
+                  <input className="extracted-input" value={extracted.dlc || ""} onChange={e => updateField("dlc", e.target.value)} placeholder="JJ/MM/AAAA" />
+                </div>
+                <div className="extracted-field">
+                  <div className="extracted-label">N° de lot</div>
+                  <input className="extracted-input" value={extracted.lot || ""} onChange={e => updateField("lot", e.target.value)} placeholder="—" />
+                </div>
+                <div className="extracted-field">
+                  <div className="extracted-label">Poids / Qté</div>
+                  <input className="extracted-input" value={extracted.poids || ""} onChange={e => updateField("poids", e.target.value)} placeholder="—" />
+                </div>
+              </div>
+              <div className="extracted-field">
+                <div className="extracted-label">Allergènes</div>
+                <input className="extracted-input" value={extracted.allergenes || ""} onChange={e => updateField("allergenes", e.target.value)} placeholder="—" />
+              </div>
+              <div className="extracted-grid">
+                <div className="extracted-field">
+                  <div className="extracted-label">Responsable</div>
+                  <input className="extracted-input" value={extracted.responsable || ""} onChange={e => updateField("responsable", e.target.value)} placeholder="—" />
+                </div>
+                <div className="extracted-field">
+                  <div className="extracted-label">Conservation</div>
+                  <input className="extracted-input" value={extracted.temperature || ""} onChange={e => updateField("temperature", e.target.value)} placeholder="—" />
+                </div>
+              </div>
+              <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 8 }}>
+                <button className="save-btn" onClick={saveLabel}>💾 Enregistrer dans le tableau</button>
+                <button className="scan-again-btn" onClick={resetScan}>↩ Scanner une autre étiquette</button>
+              </div>
+            </div>
+          )}
+
+          {/* Manual entry if no API key */}
+          {!apiKey && !image && (
+            <div style={{ textAlign: "center", padding: "8px 0", color: theme.textMuted, fontSize: 12 }}>
+              Sans clé API, vous pouvez scanner manuellement après la photo
+            </div>
+          )}
+        </div>
+      )}
+
+      {view === "table" && (
+        <div style={{ padding: "0 16px" }}>
+          {labels.length === 0 ? (
+            <div className="empty-state">
+              <div className="empty-icon">🏷️</div>
+              <div>Aucune étiquette scannée</div>
+              <div style={{ marginTop: 6, fontSize: 12 }}>Allez dans "Scanner" pour photographier une étiquette</div>
+            </div>
+          ) : (
+            <>
+              <div style={{ fontSize: 12, color: theme.textMuted, marginBottom: 10 }}>{labels.length} étiquette(s) enregistrée(s)</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {labels.map(l => {
+                  const status = dlcStatus(l.dlc);
+                  return (
+                    <div key={l.id} style={{ background: theme.card, border: `1px solid ${status === "expired" ? theme.danger + "44" : status === "soon" ? theme.warning + "44" : theme.border}`, borderRadius: 14, padding: 14 }}>
+                      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 8 }}>
+                        <div style={{ fontWeight: 700, fontSize: 15 }}>{l.nom || "—"}</div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <span className={`dlc-badge ${status}`}>{dlcLabel(status)}</span>
+                          <span style={{ fontSize: 18, cursor: "pointer", color: theme.danger, opacity: 0.6 }} onClick={() => deleteLabel(l.id)}>✕</span>
+                        </div>
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+                        {[
+                          ["Fabrication", l.dateFabrication],
+                          ["DLC", l.dlc],
+                          ["Lot", l.lot],
+                          ["Poids", l.poids],
+                          ["Conservation", l.temperature],
+                          ["Scanné le", l.scanDate],
+                        ].map(([k, v]) => v && (
+                          <div key={k} style={{ fontSize: 11, color: theme.textMuted }}>
+                            {k} : <span style={{ color: k === "DLC" && status !== "ok" ? (status === "expired" ? theme.danger : theme.warning) : theme.text, fontWeight: 500 }}>{v}</span>
+                          </div>
+                        ))}
+                      </div>
+                      {l.allergenes && (
+                        <div style={{ marginTop: 8, paddingTop: 8, borderTop: `1px solid ${theme.border}`, fontSize: 11, color: theme.danger }}>
+                          ⚠️ Allergènes : {l.allergenes}
+                        </div>
+                      )}
+                      {l.responsable && (
+                        <div style={{ marginTop: 4, fontSize: 11, color: theme.textMuted }}>
+                          Chef : <span style={{ color: theme.text }}>{l.responsable}</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* API Key Modal */}
+      {showKeyModal && (
+        <div className="modal-overlay" onClick={() => setShowKeyModal(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-handle" />
+            <div className="modal-title">🔑 Clé API Anthropic</div>
+            <div style={{ fontSize: 12, color: theme.textMuted, marginBottom: 14 }}>
+              Votre clé API permet d'utiliser Claude Vision pour lire automatiquement le contenu des étiquettes. Elle est stockée localement sur votre appareil.
+            </div>
+            <input
+              className="key-modal-input"
+              type="password"
+              placeholder="sk-ant-api03-..."
+              value={keyInput}
+              onChange={e => setKeyInput(e.target.value)}
+              autoFocus
+            />
+            <button className="modal-confirm" onClick={saveKey} disabled={!keyInput}>✅ Enregistrer</button>
+            <button className="modal-cancel" onClick={() => setShowKeyModal(false)}>Annuler</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── APP ROOT ─────────────────────────────────────────────────────────────────
 export default function App() {
   const [screen, setScreen] = useState("home");
@@ -562,11 +945,13 @@ export default function App() {
     {id:"stock",icon:"📦",label:"Stocks"},
     {id:"label",icon:"🏷️",label:"Étiq."},
     {id:"trace",icon:"🔍",label:"Traça."},
+    {id:"scan",icon:"📷",label:"Scan"},
   ];
 
   const screenTitles = {
     home:"Accueil", temp:"Températures", haccp:"Plan HACCP",
-    stock:"Gestion des stocks", label:"Étiquetage", trace:"Traçabilité"
+    stock:"Gestion des stocks", label:"Étiquetage", trace:"Traçabilité",
+    scan:"Scan Étiquettes"
   };
 
   return (
@@ -596,6 +981,7 @@ export default function App() {
           {screen === "stock" && <StockScreen stock={stock}/>}
           {screen === "label" && <LabelScreen/>}
           {screen === "trace" && <TraceScreen/>}
+          {screen === "scan" && <PhotoLabelScreen/>}
         </div>
 
         <div className="bottom-nav">
