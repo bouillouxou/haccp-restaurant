@@ -32,9 +32,47 @@ const dlcStatus = (dlcStr) => {
   return { label: `${diff}j restants`, color: "#22c55e", bg: "#052e16" };
 };
 
+// ─── DONNÉES MARS 2026 (seed) ─────────────────────────────────────────────────
+const d = (s) => new Date(s + "T12:00:00").getTime();
+const MARCH_SEED = [
+  { id: -1,  type:"trace", date:d("2026-03-04"), product:"Filet de poulet frais HALAL",              supplier:"ABC Peyraud",              lot:"022762006",       dlc:"2026-03-12", qty:"10 kg",      note:"Prod. 27/02/26 · Origine Pologne" },
+  { id: -2,  type:"trace", date:d("2026-03-04"), product:"Bavette d'aloyau (Beef flank muscle)",      supplier:"ABP Ireland",              lot:"CL26084771A",     dlc:"2026-03-26", qty:"",           note:"Pack 19/02/26 · Origine Irlande" },
+  { id: -3,  type:"trace", date:d("2026-03-04"), product:"Collier poitrine à blanquette",             supplier:"Table de Solange",         lot:"02055AG26061",    dlc:"2026-03-20", qty:"5,080 kg",   note:"Origine France" },
+  { id: -4,  type:"trace", date:d("2026-03-04"), product:"Collier poitrine à bourguignon Aubrac",     supplier:"Table de Solange",         lot:"11058AR26061",    dlc:"2026-03-20", qty:"5,105 kg",   note:"Origine France" },
+  { id: -5,  type:"trace", date:d("2026-03-04"), product:"Collier poitrine semelle à tartare Aubrac", supplier:"Table de Solange",         lot:"11058AG26062",    dlc:"2026-03-21", qty:"10,160 kg",  note:"Origine France" },
+  { id: -6,  type:"trace", date:d("2026-03-11"), product:"Cuisses de poulet HALAL",                   supplier:"ABC Peyraud",              lot:"",                dlc:"2026-03-12", qty:"10 kg",      note:"Abattage 06/03/26 · Origine BE/NL/FR · BE E2039 EG" },
+  { id: -7,  type:"trace", date:d("2026-03-11"), product:"Filet de poulet frais",                     supplier:"ABC Peyraud",              lot:"",                dlc:"",           qty:"7,50 kg",    note:"Produit frais" },
+  { id: -8,  type:"trace", date:d("2026-03-11"), product:"Poitrine fumée en tranches",                supplier:"ABC Peyraud",              lot:"",                dlc:"",           qty:"2,68 kg",    note:"Charcuterie" },
+  { id: -9,  type:"trace", date:d("2026-03-13"), product:"Cuisses de poulet halal",                   supplier:"Max-Miles / MAQ",          lot:"06506065",        dlc:"2026-03-15", qty:"",           note:"Production 06/03/26 · Origine Pologne · PL 06090601 WE" },
+  { id: -10, type:"trace", date:d("2026-03-13"), product:"Filet de poulet frais",                     supplier:"KPS Food / ABC Peyraud",   lot:"66064507343",     dlc:"2026-03-19", qty:"",           note:"Production 05/03/26 · Origine Pologne · PL 14633901 UE" },
+  { id: -11, type:"trace", date:d("2026-03-13"), product:"Filet de poulet frais (2)",                 supplier:"KPS Food / ABC Peyraud",   lot:"66064507343",     dlc:"2026-03-19", qty:"",           note:"Production 05/03/26 · Origine Pologne · PL 14633901 UE" },
+  { id: -12, type:"trace", date:d("2026-03-13"), product:"Bavette d'aloyau (flanchet)",               supplier:"EGM Viande",               lot:"87480",           dlc:"2026-03-25", qty:"",           note:"Emballé 09/03/26 · Origine Espagne · ES 10.26761/V" },
+  { id: -13, type:"trace", date:d("2026-03-13"), product:"Magret de canard",                          supplier:"Foie Gras Partners",       lot:"L260305-194-432", dlc:"2026-03-27", qty:"",           note:"Origine Hongrie · HU 194 EK" },
+  { id: -14, type:"trace", date:d("2026-03-12"), product:"Collier poitrine à bourguignon Aubrac",     supplier:"Agriviande",               lot:"11065AR26071",    dlc:"2026-03-30", qty:"7,710 kg",   note:"Origine France · FR 12-057-012 CE" },
+  { id: -15, type:"trace", date:d("2026-03-12"), product:"Collier poitrine à blanquette",             supplier:"Agriviande",               lot:"02065AG26070",    dlc:"2026-03-29", qty:"5,085 kg",   note:"Origine France · FR 12-057-012 CE" },
+  { id: -16, type:"trace", date:d("2026-03-12"), product:"Collier poitrine semelle à tartare",        supplier:"Agriviande",               lot:"11065AG26069",    dlc:"2026-03-28", qty:"2,550 kg",   note:"Origine France · FR 12-057-012 CE" },
+  { id: -17, type:"trace", date:d("2026-03-12"), product:"Collier poitrine semelle (A)",              supplier:"Agriviande",               lot:"4897A070",        dlc:"2026-03-29", qty:"5,050 kg",   note:"Origine France · FR 12-057-012 CE" },
+  { id: -18, type:"trace", date:d("2026-03-12"), product:"Collier poitrine semelle (B)",              supplier:"Agriviande",               lot:"4897B070",        dlc:"2026-03-29", qty:"5,050 kg",   note:"Origine France · FR 12-057-012 CE" },
+  { id: -19, type:"trace", date:d("2026-03-13"), product:'Jambon cuit supérieur "Le Mistral"',        supplier:"André Bazin / ABC Peyraud",lot:"775094",          dlc:"2026-07-11", qty:"7,350 kg",   note:"Origine UE · FR 70.083.001 UE" },
+  { id: -20, type:"trace", date:d("2026-03-18"), product:"Collier poitrine à blanquette (A)",         supplier:"Agriviande",               lot:"02065AG26076",    dlc:"2026-03-30", qty:"2,515 kg",   note:"Origine France · FR 12-057-012 CE" },
+  { id: -21, type:"trace", date:d("2026-03-18"), product:"Collier poitrine à blanquette (B)",         supplier:"Agriviande",               lot:"02065AG26072",    dlc:"2026-03-31", qty:"3,050 kg",   note:"Origine France · FR 12-057-012 CE" },
+  { id: -22, type:"trace", date:d("2026-03-18"), product:"Collier poitrine semelle",                  supplier:"Agriviande",               lot:"11072AR26075",    dlc:"2026-04-03", qty:"5,015 kg",   note:"Origine France · FR 12-057-012 CE" },
+  { id: -23, type:"trace", date:d("2026-03-18"), product:"Collier poitrine à bourguignon",            supplier:"Agriviande",               lot:"11063AR26R076",   dlc:"2026-03-24", qty:"5,045 kg",   note:"Origine France · FR 12-057-012 CE" },
+  { id: -24, type:"trace", date:d("2026-03-18"), product:"Cuisses de canard confites",                supplier:"Clos du Canard",           lot:"26041CF2",        dlc:"2026-11-07", qty:"6,400 kg",   note:"Origine France" },
+  { id: -25, type:"trace", date:d("2026-03-18"), product:"Collier poitrine semelle (gros)",           supplier:"Agriviande",               lot:"11077AR26078",    dlc:"2026-04-06", qty:"15,135 kg",  note:"Origine France · FR 12-057-012 CE" },
+  { id: -26, type:"trace", date:d("2026-03-18"), product:"Filet de poulet frais",                     supplier:"Farmio",                   lot:"822586070",       dlc:"2026-03-30", qty:"5 kg",       note:"Origine Pologne" },
+  { id: -27, type:"trace", date:d("2026-03-18"), product:"Cuisses de poulet",                         supplier:"",                         lot:"",                dlc:"2026-03-26", qty:"10 kg",       note:"Origine Belgique · BE039 EG" },
+];
+
 const useStorage = () => {
   const [records, setRecords] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("haccp_v2") || "[]"); } catch { return []; }
+    try {
+      const stored = JSON.parse(localStorage.getItem("haccp_v2") || "null");
+      if (stored !== null) return stored;
+      // Premier lancement : on injecte les données de mars 2026
+      localStorage.setItem("haccp_v2", JSON.stringify(MARCH_SEED));
+      return MARCH_SEED;
+    } catch { return MARCH_SEED; }
   });
   const add = (r) => {
     const next = [{ ...r, id: Date.now() }, ...records];
@@ -328,22 +366,46 @@ function PhotoTab({ records, onAdd, onRemove }) {
           <h3 style={{ fontSize: 13, color: "#64748b", marginBottom: 10, letterSpacing: 1 }}>
             PHOTOS ({records.length})
           </h3>
-          {records.map((r) => (
-            <Card key={r.id}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 600 }}>{r.label}</div>
-                  <div style={{ fontSize: 11, color: "#64748b" }}>{fmtDate(r.date)}</div>
-                </div>
-                <button onClick={() => onRemove(r.id)} style={{
-                  background: "none", border: "none", color: "#475569", fontSize: 20, cursor: "pointer",
-                }}>×</button>
-              </div>
-              <img src={r.img} alt={r.label} style={{
-                width: "100%", borderRadius: 10, maxHeight: 220, objectFit: "cover",
-              }} />
-            </Card>
-          ))}
+          <div style={{ overflowX: "auto", borderRadius: 12, border: "1px solid #334155" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+              <thead>
+                <tr style={{ background: "#0f172a" }}>
+                  {["Aperçu", "Libellé", "Date", ""].map((h) => (
+                    <th key={h} style={{
+                      padding: "10px 10px", textAlign: "left", color: "#64748b",
+                      fontWeight: 600, whiteSpace: "nowrap",
+                      borderBottom: "1px solid #334155",
+                    }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {records.map((r, i) => (
+                  <tr key={r.id} style={{ background: i % 2 === 0 ? "#1e293b" : "#162032", verticalAlign: "middle" }}>
+                    <td style={{ padding: "8px 10px" }}>
+                      <img src={r.img} alt={r.label} style={{
+                        width: 56, height: 56, objectFit: "cover",
+                        borderRadius: 8, display: "block",
+                      }} />
+                    </td>
+                    <td style={{ padding: "8px 10px", fontWeight: 600, color: "#f1f5f9", maxWidth: 160 }}>
+                      {r.label}
+                    </td>
+                    <td style={{ padding: "8px 10px", color: "#64748b", whiteSpace: "nowrap" }}>
+                      {fmtDate(r.date)}
+                    </td>
+                    <td style={{ padding: "8px 10px" }}>
+                      <button onClick={() => onRemove(r.id)} style={{
+                        background: "#0f172a", border: "1px solid #334155",
+                        color: "#64748b", borderRadius: 6, padding: "4px 8px",
+                        fontSize: 14, cursor: "pointer",
+                      }}>×</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </>
       )}
     </div>
