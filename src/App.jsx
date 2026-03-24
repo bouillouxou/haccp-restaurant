@@ -294,9 +294,11 @@ function TraceTab({ records, onAdd, onRemove }) {
                     {r.note && <div style={{ fontSize: 12, color: "#64748b", fontStyle: "italic", marginTop: 4 }}>{r.note}</div>}
                   </div>
                   <button onClick={() => onRemove(r.id)} style={{
-                    background: "none", border: "none", color: "#475569",
-                    fontSize: 20, cursor: "pointer", padding: "0 0 0 12px",
-                  }}>×</button>
+                    background: "#0f172a", border: "1px solid #334155",
+                    color: "#22c55e", borderRadius: 8, padding: "6px 10px",
+                    fontSize: 11, fontWeight: 600, cursor: "pointer",
+                    flexShrink: 0, whiteSpace: "nowrap",
+                  }}>✓ Utilisé</button>
                 </div>
               </Card>
             );
@@ -413,27 +415,26 @@ function PhotoTab({ records, onAdd, onRemove }) {
 }
 
 // ─── TABLEAU DE BORD ──────────────────────────────────────────────────────────
-function DashTab({ records }) {
+function DashTab({ records, onRemove }) {
   const traces = records.filter((r) => r.type === "trace");
-  const temps = records.filter((r) => r.type === "temp");
+  const temps  = records.filter((r) => r.type === "temp");
 
-  const expired = traces.filter((r) => dlcStatus(r.dlc)?.color === "#ef4444");
-  const warning = traces.filter((r) => {
-    const c = dlcStatus(r.dlc)?.color;
-    return c === "#eab308" || c === "#f97316";
-  });
+  const expired    = traces.filter((r) => dlcStatus(r.dlc)?.color === "#ef4444");
+  const warning    = traces.filter((r) => { const c = dlcStatus(r.dlc)?.color; return c === "#eab308" || c === "#f97316"; });
   const tempAlerts = temps.filter((r) => r.entries?.some((e) => !e.ok));
-  const lastTemp = temps[0];
+  const lastTemp   = temps[0];
+
+  const purgeExpired = () => expired.forEach((r) => onRemove(r.id));
 
   return (
     <div>
       {/* KPIs */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
         {[
-          { label: "Produits\nen stock", value: traces.length, color: "#38bdf8", border: "#0369a1" },
-          { label: "DLC\nexpirées", value: expired.length, color: "#ef4444", border: "#7f1d1d" },
-          { label: "DLC ≤ 3\njours", value: warning.length, color: "#eab308", border: "#713f12" },
-          { label: "Anomalies\ntempérature", value: tempAlerts.length, color: tempAlerts.length ? "#f97316" : "#22c55e", border: tempAlerts.length ? "#7c2d12" : "#14532d" },
+          { label: "Produits\nen stock",     value: traces.length,      color: "#38bdf8", border: "#0369a1" },
+          { label: "DLC\nexpirées",           value: expired.length,     color: "#ef4444", border: "#7f1d1d" },
+          { label: "DLC ≤ 3\njours",          value: warning.length,     color: "#eab308", border: "#713f12" },
+          { label: "Anomalies\ntempérature",  value: tempAlerts.length,  color: tempAlerts.length ? "#f97316" : "#22c55e", border: tempAlerts.length ? "#7c2d12" : "#14532d" },
         ].map((k) => (
           <div key={k.label} style={{
             background: "#1e293b", border: `1px solid ${k.border}`,
@@ -448,25 +449,44 @@ function DashTab({ records }) {
       {/* Alertes DLC */}
       {(expired.length > 0 || warning.length > 0) && (
         <>
-          <h3 style={{ fontSize: 13, color: "#64748b", marginBottom: 10, letterSpacing: 1 }}>
-            ⚠ ALERTES DLC
-          </h3>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+            <h3 style={{ fontSize: 13, color: "#64748b", letterSpacing: 1, margin: 0 }}>⚠ ALERTES DLC</h3>
+            {expired.length > 0 && (
+              <button onClick={purgeExpired} style={{
+                background: "#450a0a", border: "1px solid #ef444444",
+                color: "#fca5a5", borderRadius: 8, padding: "5px 10px",
+                fontSize: 11, fontWeight: 600, cursor: "pointer",
+              }}>
+                🗑 Purger les expirés ({expired.length})
+              </button>
+            )}
+          </div>
           {[...expired, ...warning].map((r) => {
             const st = dlcStatus(r.dlc);
             return (
               <div key={r.id} style={{
                 background: st.bg, border: `1px solid ${st.color}44`,
-                borderRadius: 12, padding: "12px 14px", marginBottom: 8,
-                display: "flex", justifyContent: "space-between", alignItems: "center",
+                borderRadius: 12, padding: "10px 12px", marginBottom: 8,
               }}>
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: "#f1f5f9" }}>{r.product}</div>
-                  <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 2 }}>
-                    DLC : {new Date(r.dlc).toLocaleDateString("fr-FR")}
-                    {r.supplier && ` · ${r.supplier}`}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "#f1f5f9", marginBottom: 2 }}>{r.product}</div>
+                    <div style={{ fontSize: 11, color: "#94a3b8" }}>
+                      DLC : {r.dlc ? new Date(r.dlc).toLocaleDateString("fr-FR") : "—"}
+                      {r.supplier && ` · ${r.supplier}`}
+                      {r.qty && ` · ${r.qty}`}
+                    </div>
                   </div>
+                  <Badge color={st.color} bg={st.bg + "99"}>{st.label}</Badge>
                 </div>
-                <Badge color={st.color} bg={st.bg + "99"}>{st.label}</Badge>
+                <button onClick={() => onRemove(r.id)} style={{
+                  marginTop: 10, width: "100%", padding: "7px",
+                  background: "#0f172a", border: "1px solid #334155",
+                  borderRadius: 8, color: "#94a3b8", fontSize: 12,
+                  fontWeight: 600, cursor: "pointer",
+                }}>
+                  ✓ Produit utilisé — Retirer du stock
+                </button>
               </div>
             );
           })}
@@ -505,36 +525,48 @@ function DashTab({ records }) {
       {traces.length > 0 && (
         <>
           <h3 style={{ fontSize: 13, color: "#64748b", margin: "16px 0 10px", letterSpacing: 1 }}>
-            📋 STOCK — TABLEAU DLC
+            📋 STOCK COMPLET — trié par DLC
           </h3>
           <div style={{ overflowX: "auto", borderRadius: 12, border: "1px solid #334155" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, minWidth: 360 }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, minWidth: 400 }}>
               <thead>
                 <tr style={{ background: "#0f172a" }}>
-                  {["Produit", "DLC", "Statut", "Lot", "Qté", "Fournisseur"].map((h) => (
+                  {["Produit", "DLC", "Statut", "Qté", "Action"].map((h) => (
                     <th key={h} style={{
                       padding: "10px 10px", textAlign: "left", color: "#64748b",
-                      fontWeight: 600, whiteSpace: "nowrap",
-                      borderBottom: "1px solid #334155",
+                      fontWeight: 600, whiteSpace: "nowrap", borderBottom: "1px solid #334155",
                     }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {[...traces].sort((a, b) => new Date(a.dlc) - new Date(b.dlc)).map((r, i) => {
+                {[...traces].sort((a, b) => {
+                  if (!a.dlc && !b.dlc) return 0;
+                  if (!a.dlc) return 1;
+                  if (!b.dlc) return -1;
+                  return new Date(a.dlc) - new Date(b.dlc);
+                }).map((r, i) => {
                   const st = dlcStatus(r.dlc);
                   return (
                     <tr key={r.id} style={{ background: i % 2 === 0 ? "#1e293b" : "#162032" }}>
-                      <td style={{ padding: "10px 10px", fontWeight: 600, color: "#f1f5f9" }}>{r.product}</td>
+                      <td style={{ padding: "10px 10px", fontWeight: 600, color: "#f1f5f9", maxWidth: 140 }}>
+                        <div style={{ fontSize: 12 }}>{r.product}</div>
+                        {r.supplier && <div style={{ fontSize: 10, color: "#475569", marginTop: 2 }}>{r.supplier}</div>}
+                      </td>
                       <td style={{ padding: "10px 10px", color: st?.color ?? "#94a3b8", whiteSpace: "nowrap" }}>
                         {r.dlc ? new Date(r.dlc).toLocaleDateString("fr-FR") : "—"}
                       </td>
                       <td style={{ padding: "8px 10px" }}>
-                        {st ? <Badge color={st.color} bg={st.bg}>{st.label}</Badge> : "—"}
+                        {st ? <Badge color={st.color} bg={st.bg}>{st.label}</Badge> : <span style={{ color: "#475569" }}>—</span>}
                       </td>
-                      <td style={{ padding: "10px 10px", color: "#94a3b8" }}>{r.lot || "—"}</td>
                       <td style={{ padding: "10px 10px", color: "#94a3b8" }}>{r.qty || "—"}</td>
-                      <td style={{ padding: "10px 10px", color: "#94a3b8" }}>{r.supplier || "—"}</td>
+                      <td style={{ padding: "8px 10px" }}>
+                        <button onClick={() => onRemove(r.id)} style={{
+                          background: "#0f172a", border: "1px solid #334155",
+                          color: "#22c55e", borderRadius: 6, padding: "5px 8px",
+                          fontSize: 11, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap",
+                        }}>✓ Utilisé</button>
+                      </td>
                     </tr>
                   );
                 })}
@@ -548,9 +580,7 @@ function DashTab({ records }) {
         <div style={{ textAlign: "center", padding: "60px 20px", color: "#475569" }}>
           <div style={{ fontSize: 52 }}>📊</div>
           <p style={{ marginTop: 16, fontSize: 15, fontWeight: 600, color: "#64748b" }}>Aucune donnée encore</p>
-          <p style={{ fontSize: 13, marginTop: 6, color: "#475569" }}>
-            Commencez par saisir des températures ou des produits
-          </p>
+          <p style={{ fontSize: 13, marginTop: 6 }}>Commencez par saisir des températures ou des produits</p>
         </div>
       )}
     </div>
@@ -617,7 +647,7 @@ export default function App() {
 
       {/* Contenu */}
       <div style={{ padding: "16px 14px" }}>
-        {tab === "dash"  && <DashTab records={records} />}
+        {tab === "dash"  && <DashTab records={records} onRemove={remove} />}
         {tab === "temp"  && <TempTab records={byType("temp")} onAdd={add} />}
         {tab === "trace" && <TraceTab records={byType("trace")} onAdd={add} onRemove={remove} />}
         {tab === "photo" && <PhotoTab records={byType("photo")} onAdd={add} onRemove={remove} />}
