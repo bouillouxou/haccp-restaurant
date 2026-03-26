@@ -1,612 +1,1008 @@
-import { useState, useEffect } from "react";
+import { useState, useRef } from "react";
 
-// ─── DESIGN SYSTEM ───────────────────────────────────────────────────────────
-const theme = {
-  bg: "#0D1117",
-  surface: "#161B22",
-  card: "#1C2230",
-  border: "#2A3441",
-  accent: "#00D4AA",
-  accentDim: "#00D4AA22",
-  accentDark: "#009E7E",
-  danger: "#FF4D6D",
-  dangerDim: "#FF4D6D22",
-  warning: "#FFB547",
-  warningDim: "#FFB54722",
-  success: "#00D4AA",
-  text: "#E6EDF3",
-  textMuted: "#7D8DA0",
-  textDim: "#4A5568",
+// ─── CONFIG ──────────────────────────────────────────────────────────────────
+const STORAGES = [
+  { id: "fridge1", label: "Frigo 1", icon: "🧊", min: 0, max: 4 },
+  { id: "fridge2", label: "Frigo 2", icon: "🧊", min: 0, max: 4 },
+  { id: "freezer", label: "Congélateur", icon: "❄️", min: -25, max: -18 },
+  { id: "ambient", label: "Ambiant", icon: "🌡️", min: 15, max: 22 },
+];
+
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
+const fmtDate = (d) =>
+  new Date(d).toLocaleString("fr-FR", {
+    day: "2-digit", month: "2-digit", year: "numeric",
+    hour: "2-digit", minute: "2-digit",
+  });
+
+const today = () =>
+  new Date().toLocaleDateString("fr-FR", {
+    weekday: "long", day: "numeric", month: "long", year: "numeric",
+  });
+
+const dlcStatus = (dlcStr) => {
+  if (!dlcStr) return null;
+  const dlc = new Date(dlcStr);
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const diff = Math.ceil((dlc - now) / 86400000);
+  if (diff < 0) return { label: `Expiré (${Math.abs(diff)}j)`, color: "#ef4444", bg: "#450a0a" };
+  if (diff === 0) return { label: "Expire aujourd'hui", color: "#f97316", bg: "#431407" };
+  if (diff <= 3) return { label: `${diff}j restant${diff > 1 ? "s" : ""}`, color: "#eab308", bg: "#422006" };
+  return { label: `${diff}j restants`, color: "#22c55e", bg: "#052e16" };
 };
 
-const fonts = `
-  @import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
-`;
-
-const css = `
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: ${theme.bg}; font-family: 'Sora', sans-serif; color: ${theme.text}; }
-  
-  .app { max-width: 430px; margin: 0 auto; min-height: 100vh; position: relative; background: ${theme.bg}; overflow: hidden; }
-  
-  .status-bar { height: 44px; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; background: ${theme.bg}; }
-  .status-time { font-size: 15px; font-weight: 600; font-family: 'JetBrains Mono'; }
-  .status-icons { display: flex; gap: 6px; align-items: center; }
-  
-  .header { padding: 8px 20px 16px; }
-  .header-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
-  .header-greeting { font-size: 13px; color: ${theme.textMuted}; }
-  .header-title { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
-  .header-date { font-size: 12px; color: ${theme.accent}; font-family: 'JetBrains Mono'; margin-top: 2px; }
-  .avatar { width: 38px; height: 38px; border-radius: 50%; background: linear-gradient(135deg, ${theme.accent}, #0088CC); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; color: #000; }
-  
-  .alert-banner { margin: 0 16px 14px; background: ${theme.dangerDim}; border: 1px solid ${theme.danger}44; border-radius: 12px; padding: 10px 14px; display: flex; align-items: center; gap: 10px; }
-  .alert-dot { width: 8px; height: 8px; border-radius: 50%; background: ${theme.danger}; flex-shrink: 0; animation: pulse 1.5s infinite; }
-  @keyframes pulse { 0%,100%{ opacity:1; transform:scale(1); } 50%{ opacity:0.5; transform:scale(1.3); } }
-  .alert-text { font-size: 12px; color: ${theme.danger}; font-weight: 500; }
-  
-  .score-strip { display: flex; gap: 10px; padding: 0 16px 16px; overflow-x: auto; scrollbar-width: none; }
-  .score-strip::-webkit-scrollbar { display: none; }
-  .score-card { flex-shrink: 0; background: ${theme.card}; border: 1px solid ${theme.border}; border-radius: 14px; padding: 12px 14px; min-width: 100px; }
-  .score-card.ok { border-color: ${theme.accent}33; }
-  .score-card.warn { border-color: ${theme.warning}33; }
-  .score-card.bad { border-color: ${theme.danger}33; }
-  .score-label { font-size: 10px; color: ${theme.textMuted}; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 6px; }
-  .score-value { font-size: 22px; font-weight: 700; font-family: 'JetBrains Mono'; }
-  .score-value.ok { color: ${theme.accent}; }
-  .score-value.warn { color: ${theme.warning}; }
-  .score-value.bad { color: ${theme.danger}; }
-  .score-sub { font-size: 10px; color: ${theme.textMuted}; margin-top: 2px; }
-  
-  .section-header { display: flex; align-items: center; justify-content: space-between; padding: 0 16px 10px; }
-  .section-title { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: ${theme.textMuted}; }
-  .section-action { font-size: 12px; color: ${theme.accent}; font-weight: 500; cursor: pointer; }
-  
-  .module-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 0 16px 16px; }
-  .module-btn { background: ${theme.card}; border: 1px solid ${theme.border}; border-radius: 16px; padding: 16px; cursor: pointer; transition: all 0.15s; text-align: left; position: relative; overflow: hidden; }
-  .module-btn:active { transform: scale(0.97); }
-  .module-btn.active { border-color: ${theme.accent}66; background: ${theme.accentDim}; }
-  .module-icon { font-size: 28px; margin-bottom: 10px; display: block; }
-  .module-name { font-size: 13px; font-weight: 600; margin-bottom: 3px; }
-  .module-count { font-size: 11px; color: ${theme.textMuted}; }
-  .module-badge { position: absolute; top: 10px; right: 10px; background: ${theme.danger}; color: white; font-size: 10px; font-weight: 700; width: 18px; height: 18px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
-  
-  .screen { animation: fadeIn 0.2s ease; }
-  @keyframes fadeIn { from { opacity:0; transform: translateY(8px); } to { opacity:1; transform: translateY(0); } }
-  
-  /* Temperature Screen */
-  .temp-list { padding: 0 16px; display: flex; flex-direction: column; gap: 10px; }
-  .temp-item { background: ${theme.card}; border: 1px solid ${theme.border}; border-radius: 14px; padding: 14px 16px; display: flex; align-items: center; gap: 14px; }
-  .temp-icon-wrap { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; }
-  .temp-icon-wrap.ok { background: ${theme.accentDim}; }
-  .temp-icon-wrap.warn { background: ${theme.warningDim}; }
-  .temp-icon-wrap.bad { background: ${theme.dangerDim}; }
-  .temp-info { flex: 1; }
-  .temp-name { font-size: 14px; font-weight: 600; }
-  .temp-zone { font-size: 11px; color: ${theme.textMuted}; margin-top: 2px; }
-  .temp-val { font-size: 20px; font-weight: 700; font-family: 'JetBrains Mono'; }
-  .temp-val.ok { color: ${theme.accent}; }
-  .temp-val.warn { color: ${theme.warning}; }
-  .temp-val.bad { color: ${theme.danger}; }
-  .temp-time { font-size: 10px; color: ${theme.textDim}; }
-  .temp-range { font-size: 10px; color: ${theme.textMuted}; }
-  
-  /* HACCP Screen */
-  .task-list { padding: 0 16px; display: flex; flex-direction: column; gap: 8px; }
-  .task-item { background: ${theme.card}; border: 1px solid ${theme.border}; border-radius: 14px; padding: 14px 16px; display: flex; align-items: center; gap: 12px; cursor: pointer; transition: all 0.15s; }
-  .task-item.done { border-color: ${theme.accent}33; opacity: 0.7; }
-  .task-item:active { transform: scale(0.98); }
-  .task-check { width: 24px; height: 24px; border-radius: 8px; border: 2px solid ${theme.border}; flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
-  .task-check.checked { background: ${theme.accent}; border-color: ${theme.accent}; }
-  .task-info { flex: 1; }
-  .task-name { font-size: 14px; font-weight: 500; }
-  .task-name.done { text-decoration: line-through; color: ${theme.textMuted}; }
-  .task-meta { font-size: 11px; color: ${theme.textMuted}; margin-top: 3px; }
-  .task-freq { font-size: 11px; padding: 2px 8px; border-radius: 20px; font-weight: 500; }
-  .task-freq.matin { background: #FFB54722; color: ${theme.warning}; }
-  .task-freq.midi { background: #00D4AA22; color: ${theme.accent}; }
-  .task-freq.soir { background: #0088CC22; color: #5BA3FF; }
-  .task-freq.continu { background: #FF4D6D22; color: ${theme.danger}; }
-  
-  /* Stock Screen */
-  .stock-filter { display: flex; gap: 8px; padding: 0 16px 14px; overflow-x: auto; scrollbar-width: none; }
-  .stock-filter::-webkit-scrollbar { display: none; }
-  .filter-chip { flex-shrink: 0; padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.15s; border: 1px solid ${theme.border}; color: ${theme.textMuted}; background: ${theme.card}; }
-  .filter-chip.active { background: ${theme.accent}; color: #000; border-color: ${theme.accent}; font-weight: 600; }
-  .stock-list { padding: 0 16px; display: flex; flex-direction: column; gap: 8px; }
-  .stock-item { background: ${theme.card}; border: 1px solid ${theme.border}; border-radius: 14px; padding: 12px 16px; }
-  .stock-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
-  .stock-name { font-size: 14px; font-weight: 600; }
-  .stock-qty { font-size: 13px; font-family: 'JetBrains Mono'; font-weight: 600; }
-  .stock-qty.low { color: ${theme.danger}; }
-  .stock-qty.medium { color: ${theme.warning}; }
-  .stock-qty.good { color: ${theme.accent}; }
-  .stock-bar-bg { height: 4px; background: ${theme.border}; border-radius: 2px; overflow: hidden; }
-  .stock-bar { height: 4px; border-radius: 2px; transition: width 0.5s; }
-  .stock-bar.low { background: ${theme.danger}; }
-  .stock-bar.medium { background: ${theme.warning}; }
-  .stock-bar.good { background: ${theme.accent}; }
-  .stock-meta { display: flex; justify-content: space-between; margin-top: 6px; }
-  .stock-cat { font-size: 11px; color: ${theme.textMuted}; }
-  .stock-exp { font-size: 11px; }
-  .stock-exp.urgent { color: ${theme.danger}; }
-  .stock-exp.ok { color: ${theme.textMuted}; }
-  
-  /* Label Screen */
-  .label-form { padding: 0 16px; display: flex; flex-direction: column; gap: 12px; }
-  .form-field { background: ${theme.card}; border: 1px solid ${theme.border}; border-radius: 14px; padding: 14px 16px; }
-  .form-label { font-size: 11px; color: ${theme.textMuted}; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 6px; }
-  .form-input { background: transparent; border: none; color: ${theme.text}; font-family: 'Sora', sans-serif; font-size: 15px; font-weight: 500; width: 100%; outline: none; }
-  .form-input::placeholder { color: ${theme.textDim}; }
-  .form-select { background: transparent; border: none; color: ${theme.text}; font-family: 'Sora', sans-serif; font-size: 15px; font-weight: 500; width: 100%; outline: none; appearance: none; cursor: pointer; }
-  .form-select option { background: ${theme.card}; }
-  .label-preview { margin: 0 16px; background: white; border-radius: 14px; padding: 16px; color: #111; }
-  .lp-title { font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; font-family: 'Sora'; }
-  .lp-name { font-size: 18px; font-weight: 700; color: #000; margin-bottom: 6px; }
-  .lp-info { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-bottom: 8px; }
-  .lp-row { font-size: 11px; color: #444; }
-  .lp-row span { font-weight: 600; color: #000; }
-  .lp-allergens { font-size: 11px; color: #cc2200; font-weight: 500; border-top: 1px solid #eee; padding-top: 8px; margin-top: 4px; }
-  .lp-lot { font-family: 'JetBrains Mono'; font-size: 10px; color: #888; margin-top: 6px; }
-  .print-btn { margin: 12px 16px 0; background: ${theme.accent}; color: #000; border: none; border-radius: 14px; padding: 16px; font-family: 'Sora', sans-serif; font-size: 15px; font-weight: 700; width: calc(100% - 32px); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.15s; }
-  .print-btn:active { transform: scale(0.98); background: ${theme.accentDark}; }
-  
-  /* Traceability Screen */
-  .trace-list { padding: 0 16px; display: flex; flex-direction: column; gap: 10px; }
-  .trace-item { background: ${theme.card}; border: 1px solid ${theme.border}; border-radius: 14px; padding: 14px 16px; }
-  .trace-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
-  .trace-name { font-size: 14px; font-weight: 600; }
-  .trace-status { font-size: 11px; padding: 3px 10px; border-radius: 20px; font-weight: 600; }
-  .trace-status.ok { background: ${theme.accentDim}; color: ${theme.accent}; }
-  .trace-status.warn { background: ${theme.warningDim}; color: ${theme.warning}; }
-  .trace-status.bad { background: ${theme.dangerDim}; color: ${theme.danger}; }
-  .trace-details { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-  .trace-detail { font-size: 11px; color: ${theme.textMuted}; }
-  .trace-detail span { color: ${theme.text}; font-weight: 500; }
-  .trace-lot { font-size: 11px; font-family: 'JetBrains Mono'; color: ${theme.accent}; margin-top: 8px; padding-top: 8px; border-top: 1px solid ${theme.border}; }
-  
-  /* Bottom Nav */
-  .bottom-nav { position: sticky; bottom: 0; background: ${theme.surface}; border-top: 1px solid ${theme.border}; display: flex; padding: 8px 0 20px; }
-  .nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; padding: 8px 4px; transition: all 0.15s; }
-  .nav-icon { font-size: 22px; transition: transform 0.15s; }
-  .nav-item.active .nav-icon { transform: scale(1.15); }
-  .nav-label { font-size: 10px; font-weight: 500; color: ${theme.textMuted}; }
-  .nav-item.active .nav-label { color: ${theme.accent}; }
-  
-  .add-btn { position: fixed; right: 20px; bottom: 100px; background: ${theme.accent}; color: #000; width: 52px; height: 52px; border-radius: 50%; border: none; font-size: 26px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 20px ${theme.accent}55; transition: all 0.15s; z-index: 10; }
-  .add-btn:active { transform: scale(0.93); }
-  
-  .scroll-area { overflow-y: auto; max-height: calc(100vh - 260px); padding-bottom: 20px; }
-  .scroll-area::-webkit-scrollbar { display: none; }
-  
-  .temp-add-btn { margin: 12px 16px 0; background: ${theme.card}; border: 1px dashed ${theme.border}; border-radius: 14px; padding: 14px; text-align: center; color: ${theme.textMuted}; font-size: 13px; cursor: pointer; transition: all 0.15s; }
-  .temp-add-btn:active { background: ${theme.accentDim}; color: ${theme.accent}; }
-  
-  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 100; display: flex; align-items: flex-end; animation: fadeIn 0.2s; }
-  .modal { background: ${theme.surface}; border-radius: 24px 24px 0 0; padding: 20px; width: 100%; max-width: 430px; margin: 0 auto; animation: slideUp 0.25s ease; }
-  @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
-  .modal-handle { width: 36px; height: 4px; background: ${theme.border}; border-radius: 2px; margin: 0 auto 16px; }
-  .modal-title { font-size: 17px; font-weight: 700; margin-bottom: 16px; }
-  .modal-input { background: ${theme.card}; border: 1px solid ${theme.border}; border-radius: 12px; padding: 14px 16px; color: ${theme.text}; font-family: 'Sora', sans-serif; font-size: 16px; width: 100%; outline: none; margin-bottom: 10px; }
-  .modal-input:focus { border-color: ${theme.accent}; }
-  .modal-row { display: flex; gap: 10px; margin-bottom: 10px; }
-  .modal-confirm { background: ${theme.accent}; color: #000; border: none; border-radius: 12px; padding: 14px; font-family: 'Sora', sans-serif; font-size: 15px; font-weight: 700; width: 100%; cursor: pointer; margin-top: 6px; }
-  .modal-cancel { background: ${theme.card}; color: ${theme.textMuted}; border: none; border-radius: 12px; padding: 14px; font-family: 'Sora', sans-serif; font-size: 15px; width: 100%; cursor: pointer; margin-top: 6px; }
-  
-  .tag { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 20px; font-size: 11px; font-weight: 500; }
-  .tag.green { background: ${theme.accentDim}; color: ${theme.accent}; }
-  .tag.red { background: ${theme.dangerDim}; color: ${theme.danger}; }
-  .tag.yellow { background: ${theme.warningDim}; color: ${theme.warning}; }
-`;
-
-// ─── DATA ─────────────────────────────────────────────────────────────────────
-const initialTemps = [
-  { id:1, name:"Chambre froide viande", zone:"Cuisine froide", temp:-1.2, min:-3, max:4, icon:"🥩", time:"08:30", status:"ok" },
-  { id:2, name:"Réfrigérateur poissons", zone:"Cuisine", temp:1.8, min:-2, max:3, icon:"🐟", time:"08:32", status:"ok" },
-  { id:3, name:"Vitrine pâtisserie", zone:"Salle", temp:6.4, min:2, max:6, icon:"🍰", time:"08:35", status:"bad" },
-  { id:4, name:"Congélateur", zone:"Réserve", temp:-18.5, min:-25, max:-15, icon:"❄️", time:"08:31", status:"ok" },
-  { id:5, name:"Bain-marie service", zone:"Cuisine chaude", temp:62.0, min:63, max:85, icon:"🍲", time:"11:45", status:"warn" },
+// ─── DONNÉES MARS 2026 (seed) ─────────────────────────────────────────────────
+const d = (s) => new Date(s + "T12:00:00").getTime();
+const MARCH_SEED = [
+  { id: -1,  type:"trace", date:d("2026-03-04"), product:"Filet de poulet frais HALAL",              supplier:"ABC Peyraud",              lot:"022762006",       dlc:"2026-03-12", qty:"10 kg",      note:"Prod. 27/02/26 · Origine Pologne" },
+  { id: -2,  type:"trace", date:d("2026-03-04"), product:"Bavette d'aloyau (Beef flank muscle)",      supplier:"ABP Ireland",              lot:"CL26084771A",     dlc:"2026-03-26", qty:"",           note:"Pack 19/02/26 · Origine Irlande" },
+  { id: -3,  type:"trace", date:d("2026-03-04"), product:"Collier poitrine à blanquette",             supplier:"Table de Solange",         lot:"02055AG26061",    dlc:"2026-03-20", qty:"5,080 kg",   note:"Origine France" },
+  { id: -4,  type:"trace", date:d("2026-03-04"), product:"Collier poitrine à bourguignon Aubrac",     supplier:"Table de Solange",         lot:"11058AR26061",    dlc:"2026-03-20", qty:"5,105 kg",   note:"Origine France" },
+  { id: -5,  type:"trace", date:d("2026-03-04"), product:"Collier poitrine semelle à tartare Aubrac", supplier:"Table de Solange",         lot:"11058AG26062",    dlc:"2026-03-21", qty:"10,160 kg",  note:"Origine France" },
+  { id: -6,  type:"trace", date:d("2026-03-11"), product:"Cuisses de poulet HALAL",                   supplier:"ABC Peyraud",              lot:"",                dlc:"2026-03-12", qty:"10 kg",      note:"Abattage 06/03/26 · Origine BE/NL/FR · BE E2039 EG" },
+  { id: -7,  type:"trace", date:d("2026-03-11"), product:"Filet de poulet frais",                     supplier:"ABC Peyraud",              lot:"",                dlc:"",           qty:"7,50 kg",    note:"Produit frais" },
+  { id: -8,  type:"trace", date:d("2026-03-11"), product:"Poitrine fumée en tranches",                supplier:"ABC Peyraud",              lot:"",                dlc:"",           qty:"2,68 kg",    note:"Charcuterie" },
+  { id: -9,  type:"trace", date:d("2026-03-13"), product:"Cuisses de poulet halal",                   supplier:"Max-Miles / MAQ",          lot:"06506065",        dlc:"2026-03-15", qty:"",           note:"Production 06/03/26 · Origine Pologne · PL 06090601 WE" },
+  { id: -10, type:"trace", date:d("2026-03-13"), product:"Filet de poulet frais",                     supplier:"KPS Food / ABC Peyraud",   lot:"66064507343",     dlc:"2026-03-19", qty:"",           note:"Production 05/03/26 · Origine Pologne · PL 14633901 UE" },
+  { id: -11, type:"trace", date:d("2026-03-13"), product:"Filet de poulet frais (2)",                 supplier:"KPS Food / ABC Peyraud",   lot:"66064507343",     dlc:"2026-03-19", qty:"",           note:"Production 05/03/26 · Origine Pologne · PL 14633901 UE" },
+  { id: -12, type:"trace", date:d("2026-03-13"), product:"Bavette d'aloyau (flanchet)",               supplier:"EGM Viande",               lot:"87480",           dlc:"2026-03-25", qty:"",           note:"Emballé 09/03/26 · Origine Espagne · ES 10.26761/V" },
+  { id: -13, type:"trace", date:d("2026-03-13"), product:"Magret de canard",                          supplier:"Foie Gras Partners",       lot:"L260305-194-432", dlc:"2026-03-27", qty:"",           note:"Origine Hongrie · HU 194 EK" },
+  { id: -14, type:"trace", date:d("2026-03-12"), product:"Collier poitrine à bourguignon Aubrac",     supplier:"Agriviande",               lot:"11065AR26071",    dlc:"2026-03-30", qty:"7,710 kg",   note:"Origine France · FR 12-057-012 CE" },
+  { id: -15, type:"trace", date:d("2026-03-12"), product:"Collier poitrine à blanquette",             supplier:"Agriviande",               lot:"02065AG26070",    dlc:"2026-03-29", qty:"5,085 kg",   note:"Origine France · FR 12-057-012 CE" },
+  { id: -16, type:"trace", date:d("2026-03-12"), product:"Collier poitrine semelle à tartare",        supplier:"Agriviande",               lot:"11065AG26069",    dlc:"2026-03-28", qty:"2,550 kg",   note:"Origine France · FR 12-057-012 CE" },
+  { id: -17, type:"trace", date:d("2026-03-12"), product:"Collier poitrine semelle (A)",              supplier:"Agriviande",               lot:"4897A070",        dlc:"2026-03-29", qty:"5,050 kg",   note:"Origine France · FR 12-057-012 CE" },
+  { id: -18, type:"trace", date:d("2026-03-12"), product:"Collier poitrine semelle (B)",              supplier:"Agriviande",               lot:"4897B070",        dlc:"2026-03-29", qty:"5,050 kg",   note:"Origine France · FR 12-057-012 CE" },
+  { id: -19, type:"trace", date:d("2026-03-13"), product:'Jambon cuit supérieur "Le Mistral"',        supplier:"André Bazin / ABC Peyraud",lot:"775094",          dlc:"2026-07-11", qty:"7,350 kg",   note:"Origine UE · FR 70.083.001 UE" },
+  { id: -20, type:"trace", date:d("2026-03-18"), product:"Collier poitrine à blanquette (A)",         supplier:"Agriviande",               lot:"02065AG26076",    dlc:"2026-03-30", qty:"2,515 kg",   note:"Origine France · FR 12-057-012 CE" },
+  { id: -21, type:"trace", date:d("2026-03-18"), product:"Collier poitrine à blanquette (B)",         supplier:"Agriviande",               lot:"02065AG26072",    dlc:"2026-03-31", qty:"3,050 kg",   note:"Origine France · FR 12-057-012 CE" },
+  { id: -22, type:"trace", date:d("2026-03-18"), product:"Collier poitrine semelle",                  supplier:"Agriviande",               lot:"11072AR26075",    dlc:"2026-04-03", qty:"5,015 kg",   note:"Origine France · FR 12-057-012 CE" },
+  { id: -23, type:"trace", date:d("2026-03-18"), product:"Collier poitrine à bourguignon",            supplier:"Agriviande",               lot:"11063AR26R076",   dlc:"2026-03-24", qty:"5,045 kg",   note:"Origine France · FR 12-057-012 CE" },
+  { id: -24, type:"trace", date:d("2026-03-18"), product:"Cuisses de canard confites",                supplier:"Clos du Canard",           lot:"26041CF2",        dlc:"2026-11-07", qty:"6,400 kg",   note:"Origine France" },
+  { id: -25, type:"trace", date:d("2026-03-18"), product:"Collier poitrine semelle (gros)",           supplier:"Agriviande",               lot:"11077AR26078",    dlc:"2026-04-06", qty:"15,135 kg",  note:"Origine France · FR 12-057-012 CE" },
+  { id: -26, type:"trace", date:d("2026-03-18"), product:"Filet de poulet frais",                     supplier:"Farmio",                   lot:"822586070",       dlc:"2026-03-30", qty:"5 kg",       note:"Origine Pologne" },
+  { id: -27, type:"trace", date:d("2026-03-18"), product:"Cuisses de poulet",                         supplier:"",                         lot:"",                dlc:"2026-03-26", qty:"10 kg",       note:"Origine Belgique · BE039 EG" },
 ];
 
-const initialTasks = [
-  { id:1, name:"Contrôle temp. ouverture", freq:"matin", done:true, who:"Chef cuisine" },
-  { id:2, name:"Nettoyage friteuse", freq:"matin", done:true, who:"Équipe cuisine" },
-  { id:3, name:"Désinfection plans de travail", freq:"midi", done:false, who:"Tout le personnel" },
-  { id:4, name:"Contrôle temp. service midi", freq:"midi", done:false, who:"Chef de partie" },
-  { id:5, name:"Vidange bacs à graisse", freq:"soir", done:false, who:"Plongeur" },
-  { id:6, name:"Nettoyage hotte aspirante", freq:"soir", done:false, who:"Équipe cuisine" },
-  { id:7, name:"Lavage mains obligatoire", freq:"continu", done:false, who:"Tout le personnel" },
-  { id:8, name:"Contrôle réception marchandises", freq:"matin", done:false, who:"Responsable" },
-];
+const useStorage = () => {
+  const [records, setRecords] = useState(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem("haccp_v2") || "null");
+      if (stored !== null) return stored;
+      // Premier lancement : on injecte les données de mars 2026
+      localStorage.setItem("haccp_v2", JSON.stringify(MARCH_SEED));
+      return MARCH_SEED;
+    } catch { return MARCH_SEED; }
+  });
+  const add = (r) => {
+    const next = [{ ...r, id: Date.now() }, ...records];
+    setRecords(next);
+    localStorage.setItem("haccp_v2", JSON.stringify(next));
+  };
+  const remove = (id) => {
+    const next = records.filter((r) => r.id !== id);
+    setRecords(next);
+    localStorage.setItem("haccp_v2", JSON.stringify(next));
+  };
+  return { records, add, remove };
+};
 
-const initialStock = [
-  { id:1, name:"Filet de bœuf", cat:"Viande", qty:4.2, max:10, unit:"kg", exp:"2026-03-10", level:"medium" },
-  { id:2, name:"Saumon frais", cat:"Poisson", qty:1.5, max:5, unit:"kg", exp:"2026-03-09", level:"low" },
-  { id:3, name:"Crème fraîche", cat:"Laitier", qty:12, max:15, unit:"L", exp:"2026-03-15", level:"good" },
-  { id:4, name:"Farine T55", cat:"Épicerie", qty:2, max:20, unit:"kg", exp:"2026-09-01", level:"low" },
-  { id:5, name:"Huile olive vierge", cat:"Épicerie", qty:8, max:10, unit:"L", exp:"2026-12-01", level:"good" },
-  { id:6, name:"Œufs frais", cat:"Laitier", qty:48, max:120, unit:"pcs", exp:"2026-03-20", level:"medium" },
-  { id:7, name:"Tomates cerises", cat:"Légumes", qty:0.8, max:5, unit:"kg", exp:"2026-03-09", level:"low" },
-];
-
-const initialTrace = [
-  { id:1, name:"Entrecôte Angus", fournisseur:"Boucherie Dupont", lot:"LOT-2026-0312", reception:"08/03/2026", ddm:"10/03/2026", status:"ok", origine:"France / Normandie", poids:"12.4 kg" },
-  { id:2, name:"Saumon Atlantique", fournisseur:"Marée Fraîche SA", lot:"LOT-MAR-0891", reception:"08/03/2026", ddm:"09/03/2026", status:"warn", origine:"Norvège", poids:"6.0 kg" },
-  { id:3, name:"Camembert AOP", fournisseur:"Fermage Normand", lot:"FM-2026-122", reception:"06/03/2026", ddm:"08/03/2026", status:"bad", origine:"France / Normandie", poids:"3.2 kg" },
-  { id:4, name:"Agneau de lait", fournisseur:"Élevage Pirénées", lot:"AGN-26-0045", reception:"07/03/2026", ddm:"12/03/2026", status:"ok", origine:"France / Pyrénées", poids:"8.5 kg" },
-];
-
-// ─── ICONS ────────────────────────────────────────────────────────────────────
-const CheckIcon = () => (
-  <svg width="12" height="10" viewBox="0 0 12 10" fill="none">
-    <path d="M1 5L4.5 8.5L11 1.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-  </svg>
+// ─── SHARED UI ───────────────────────────────────────────────────────────────
+const Badge = ({ children, color, bg }) => (
+  <span style={{
+    display: "inline-block", padding: "2px 8px", borderRadius: 20,
+    fontSize: 11, fontWeight: 600, color, background: bg, whiteSpace: "nowrap",
+  }}>{children}</span>
 );
 
-// ─── SCREENS ──────────────────────────────────────────────────────────────────
+const Card = ({ children, style }) => (
+  <div style={{
+    background: "#1e293b", border: "1px solid #334155",
+    borderRadius: 14, padding: "16px", marginBottom: 12, ...style,
+  }}>{children}</div>
+);
 
-function HomeScreen({ temps, tasks, stock, onNavigate }) {
-  const doneCount = tasks.filter(t => t.done).length;
-  const alertTemp = temps.filter(t => t.status !== "ok").length;
-  const lowStock = stock.filter(s => s.level === "low").length;
-  const today = new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
+const Input = ({ label, ...props }) => (
+  <div style={{ marginBottom: 14 }}>
+    {label && <label style={{ display: "block", fontSize: 12, color: "#94a3b8", marginBottom: 5, fontWeight: 500 }}>{label}</label>}
+    <input style={{
+      width: "100%", padding: "11px 13px", background: "#0f172a",
+      border: "1px solid #334155", borderRadius: 9, color: "#f1f5f9",
+      fontSize: 15, outline: "none", boxSizing: "border-box",
+    }} {...props} />
+  </div>
+);
+
+const Btn = ({ children, variant = "primary", style: s, ...props }) => (
+  <button style={{
+    width: "100%", padding: "13px", border: "none", borderRadius: 10,
+    fontSize: 15, fontWeight: 600, cursor: "pointer", marginTop: 4,
+    background: variant === "primary" ? "linear-gradient(135deg,#0ea5e9,#6366f1)" : "#1e293b",
+    color: "#fff", letterSpacing: 0.2, ...s,
+  }} {...props}>{children}</button>
+);
+
+const Flash = ({ show, text = "✓ Enregistré" }) =>
+  show ? (
+    <div style={{
+      marginTop: 10, padding: "10px", borderRadius: 8, textAlign: "center",
+      background: "#052e16", color: "#22c55e", fontSize: 13, fontWeight: 600,
+    }}>{text}</div>
+  ) : null;
+
+// ─── ONGLET TEMPÉRATURES ──────────────────────────────────────────────────────
+function TempTab({ records, onAdd }) {
+  const [vals, setVals] = useState({});
+  const [flash, setFlash] = useState(false);
+
+  const set = (id, v) => setVals((p) => ({ ...p, [id]: v }));
+
+  const submit = (e) => {
+    e.preventDefault();
+    const entries = STORAGES.map((s) => {
+      const val = parseFloat(vals[s.id] ?? "");
+      return { ...s, value: val, ok: !isNaN(val) && val >= s.min && val <= s.max };
+    }).filter((e) => !isNaN(e.value));
+    if (!entries.length) return;
+    onAdd({ type: "temp", date: Date.now(), entries });
+    setVals({});
+    setFlash(true);
+    setTimeout(() => setFlash(false), 2500);
+  };
 
   return (
-    <div className="screen">
-      <div className="header">
-        <div className="header-top">
-          <div>
-            <div className="header-greeting">Bonjour, Chef 👋</div>
-            <div className="header-title">Tableau de bord</div>
-            <div className="header-date">{today.charAt(0).toUpperCase() + today.slice(1)}</div>
-          </div>
-          <div className="avatar">CL</div>
-        </div>
-      </div>
+    <div>
+      <Card>
+        <p style={{ fontSize: 13, color: "#64748b", marginBottom: 16 }}>{today()}</p>
+        <form onSubmit={submit}>
+          {STORAGES.map((s) => {
+            const v = vals[s.id] ?? "";
+            const num = parseFloat(v);
+            const ok = !isNaN(num) && num >= s.min && num <= s.max;
+            const nok = !isNaN(num) && (num < s.min || num > s.max);
+            return (
+              <div key={s.id} style={{
+                display: "flex", alignItems: "center", gap: 10,
+                padding: "10px 0", borderBottom: "1px solid #0f172a",
+              }}>
+                <span style={{ fontSize: 22, width: 30 }}>{s.icon}</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600 }}>{s.label}</div>
+                  <div style={{ fontSize: 11, color: "#475569" }}>{s.min}°C → {s.max}°C</div>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <input
+                    type="number" step="0.1" value={v}
+                    onChange={(e) => set(s.id, e.target.value)}
+                    placeholder="—"
+                    style={{
+                      width: 72, padding: "8px 10px", textAlign: "center",
+                      background: "#0f172a", fontSize: 15, fontWeight: 600,
+                      borderRadius: 8, color: ok ? "#22c55e" : nok ? "#ef4444" : "#f1f5f9",
+                      border: `1.5px solid ${ok ? "#22c55e" : nok ? "#ef4444" : "#334155"}`,
+                      outline: "none",
+                    }}
+                  />
+                  <span style={{ fontSize: 16, width: 20 }}>{ok ? "✅" : nok ? "❌" : ""}</span>
+                </div>
+              </div>
+            );
+          })}
+          <Btn type="submit" style={{ marginTop: 16 }}>Enregistrer le relevé</Btn>
+          <Flash show={flash} text="✓ Relevé enregistré" />
+        </form>
+      </Card>
 
-      {(alertTemp > 0 || lowStock > 0) && (
-        <div className="alert-banner">
-          <div className="alert-dot"/>
-          <div className="alert-text">
-            {alertTemp > 0 && `${alertTemp} alerte(s) température`}
-            {alertTemp > 0 && lowStock > 0 && " · "}
-            {lowStock > 0 && `${lowStock} produit(s) en rupture`}
-          </div>
-        </div>
+      {records.length > 0 && (
+        <>
+          <h3 style={{ fontSize: 13, color: "#64748b", marginBottom: 10, letterSpacing: 1 }}>
+            HISTORIQUE ({records.length})
+          </h3>
+          {records.map((r) => {
+            const hasAlert = r.entries.some((e) => !e.ok);
+            return (
+              <Card key={r.id} style={{ borderColor: hasAlert ? "#7f1d1d" : "#334155" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10, alignItems: "center" }}>
+                  <span style={{ fontSize: 12, color: "#64748b" }}>{fmtDate(r.date)}</span>
+                  {hasAlert
+                    ? <Badge color="#ef4444" bg="#450a0a">⚠ Anomalie</Badge>
+                    : <Badge color="#22c55e" bg="#052e16">✓ Conforme</Badge>}
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+                  {r.entries.map((e) => (
+                    <div key={e.id} style={{
+                      background: "#0f172a", borderRadius: 8, padding: "8px 10px",
+                      borderLeft: `3px solid ${e.ok ? "#22c55e" : "#ef4444"}`,
+                    }}>
+                      <div style={{ fontSize: 11, color: "#64748b" }}>{e.label}</div>
+                      <div style={{ fontSize: 17, fontWeight: 700, color: e.ok ? "#22c55e" : "#ef4444" }}>
+                        {e.value}°C
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            );
+          })}
+        </>
       )}
+    </div>
+  );
+}
 
-      <div className="score-strip">
-        <div className="score-card ok">
-          <div className="score-label">Tâches</div>
-          <div className="score-value ok">{doneCount}/{tasks.length}</div>
-          <div className="score-sub">Complétées</div>
-        </div>
-        <div className={`score-card ${alertTemp > 0 ? "bad" : "ok"}`}>
-          <div className="score-label">Températures</div>
-          <div className={`score-value ${alertTemp > 0 ? "bad" : "ok"}`}>{alertTemp}</div>
-          <div className="score-sub">Alertes</div>
-        </div>
-        <div className={`score-card ${lowStock > 0 ? "warn" : "ok"}`}>
-          <div className="score-label">Stocks</div>
-          <div className={`score-value ${lowStock > 0 ? "warn" : "ok"}`}>{lowStock}</div>
-          <div className="score-sub">Ruptures</div>
-        </div>
-        <div className="score-card ok">
-          <div className="score-label">Traçabilité</div>
-          <div className="score-value ok">{initialTrace.filter(t=>t.status==="ok").length}</div>
-          <div className="score-sub">Conformes</div>
-        </div>
-      </div>
+// ─── ONGLET TRAÇABILITÉ ───────────────────────────────────────────────────────
+function TraceTab({ records, onAdd, onRemove }) {
+  const empty = { product: "", lot: "", dlc: "", supplier: "", qty: "", note: "" };
+  const [form, setForm] = useState(empty);
+  const [flash, setFlash] = useState(false);
 
-      <div className="section-header">
-        <div className="section-title">Modules</div>
-        <div className="section-action">Tout voir</div>
-      </div>
+  const ch = (k) => (e) => setForm((p) => ({ ...p, [k]: e.target.value }));
 
-      <div className="module-grid">
+  const submit = (e) => {
+    e.preventDefault();
+    if (!form.product || !form.dlc) return;
+    onAdd({ type: "trace", date: Date.now(), ...form });
+    setForm(empty);
+    setFlash(true);
+    setTimeout(() => setFlash(false), 2500);
+  };
+
+  return (
+    <div>
+      <Card>
+        <form onSubmit={submit}>
+          <Input label="Produit *" value={form.product} onChange={ch("product")} placeholder="ex: Bœuf haché" required />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <Input label="N° de lot" value={form.lot} onChange={ch("lot")} placeholder="LOT-001" />
+            <Input label="Quantité" value={form.qty} onChange={ch("qty")} placeholder="ex: 2 kg" />
+          </div>
+          <Input label="DLC / DDM *" type="date" value={form.dlc} onChange={ch("dlc")} required />
+          <Input label="Fournisseur" value={form.supplier} onChange={ch("supplier")} placeholder="ex: Metro" />
+          <Input label="Note" value={form.note} onChange={ch("note")} placeholder="Remarques..." />
+          <Btn type="submit">Enregistrer la réception</Btn>
+          <Flash show={flash} text="✓ Produit enregistré" />
+        </form>
+      </Card>
+
+      {records.length > 0 && (
+        <>
+          <h3 style={{ fontSize: 13, color: "#64748b", marginBottom: 10, letterSpacing: 1 }}>
+            STOCK ({records.length} produits)
+          </h3>
+          {records.map((r) => {
+            const st = dlcStatus(r.dlc);
+            return (
+              <Card key={r.id} style={{
+                borderColor: st?.color === "#ef4444" ? "#7f1d1d"
+                  : st?.color === "#eab308" ? "#713f12" : "#334155",
+              }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>{r.product}</div>
+                    <div style={{ fontSize: 11, color: "#64748b", marginBottom: 8 }}>
+                      Enregistré le {fmtDate(r.date)}
+                    </div>
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 6 }}>
+                      {st && <Badge color={st.color} bg={st.bg}>{st.label}</Badge>}
+                      {r.qty && <Badge color="#94a3b8" bg="#1e3a5f">{r.qty}</Badge>}
+                    </div>
+                    <div style={{ fontSize: 12, color: "#475569", lineHeight: 2 }}>
+                      {r.dlc && <span>DLC : <b style={{ color: "#94a3b8" }}>{new Date(r.dlc).toLocaleDateString("fr-FR")}</b>  </span>}
+                      {r.lot && <span>Lot : <b style={{ color: "#94a3b8" }}>{r.lot}</b>  </span>}
+                      {r.supplier && <span>Fourn. : <b style={{ color: "#94a3b8" }}>{r.supplier}</b></span>}
+                    </div>
+                    {r.note && <div style={{ fontSize: 12, color: "#64748b", fontStyle: "italic", marginTop: 4 }}>{r.note}</div>}
+                  </div>
+                  <button onClick={() => onRemove(r.id)} style={{
+                    background: "#0f172a", border: "1px solid #334155",
+                    color: "#22c55e", borderRadius: 8, padding: "6px 10px",
+                    fontSize: 11, fontWeight: 600, cursor: "pointer",
+                    flexShrink: 0, whiteSpace: "nowrap",
+                  }}>✓ Utilisé</button>
+                </div>
+              </Card>
+            );
+          })}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─── ONGLET PHOTOS ────────────────────────────────────────────────────────────
+function PhotoTab({ records, onAdd, onRemove }) {
+  const inputRef = useRef();
+  const [label, setLabel] = useState("");
+  const [preview, setPreview] = useState(null);
+  const [flash, setFlash] = useState(false);
+
+  const onFile = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => setPreview(ev.target.result);
+    reader.readAsDataURL(file);
+  };
+
+  const submit = (e) => {
+    e.preventDefault();
+    if (!preview) return;
+    onAdd({ type: "photo", date: Date.now(), label: label || "Photo", img: preview });
+    setLabel(""); setPreview(null);
+    inputRef.current.value = "";
+    setFlash(true);
+    setTimeout(() => setFlash(false), 2500);
+  };
+
+  return (
+    <div>
+      <Card>
+        <form onSubmit={submit}>
+          <Input label="Libellé" value={label} onChange={(e) => setLabel(e.target.value)} placeholder="ex: Livraison légumes frais" />
+          <button type="button" onClick={() => inputRef.current.click()} style={{
+            width: "100%", padding: "32px 16px", background: "#0f172a",
+            border: "2px dashed #334155", borderRadius: 12, color: "#64748b",
+            fontSize: 13, cursor: "pointer", display: "flex", flexDirection: "column",
+            alignItems: "center", gap: 10, marginBottom: 12,
+          }}>
+            <span style={{ fontSize: 36 }}>📷</span>
+            <span>Appuyer pour prendre une photo</span>
+          </button>
+          <input ref={inputRef} type="file" accept="image/*" capture="environment" onChange={onFile} style={{ display: "none" }} />
+
+          {preview && (
+            <>
+              <img src={preview} alt="preview" style={{
+                width: "100%", borderRadius: 10, maxHeight: 240,
+                objectFit: "cover", marginBottom: 12,
+              }} />
+              <Btn type="submit">Enregistrer la photo</Btn>
+            </>
+          )}
+          <Flash show={flash} text="✓ Photo enregistrée" />
+        </form>
+      </Card>
+
+      {records.length > 0 && (
+        <>
+          <h3 style={{ fontSize: 13, color: "#64748b", marginBottom: 10, letterSpacing: 1 }}>
+            PHOTOS ({records.length})
+          </h3>
+          <div style={{ overflowX: "auto", borderRadius: 12, border: "1px solid #334155" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+              <thead>
+                <tr style={{ background: "#0f172a" }}>
+                  {["Aperçu", "Libellé", "Date", ""].map((h) => (
+                    <th key={h} style={{
+                      padding: "10px 10px", textAlign: "left", color: "#64748b",
+                      fontWeight: 600, whiteSpace: "nowrap",
+                      borderBottom: "1px solid #334155",
+                    }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {records.map((r, i) => (
+                  <tr key={r.id} style={{ background: i % 2 === 0 ? "#1e293b" : "#162032", verticalAlign: "middle" }}>
+                    <td style={{ padding: "8px 10px" }}>
+                      <img src={r.img} alt={r.label} style={{
+                        width: 56, height: 56, objectFit: "cover",
+                        borderRadius: 8, display: "block",
+                      }} />
+                    </td>
+                    <td style={{ padding: "8px 10px", fontWeight: 600, color: "#f1f5f9", maxWidth: 160 }}>
+                      {r.label}
+                    </td>
+                    <td style={{ padding: "8px 10px", color: "#64748b", whiteSpace: "nowrap" }}>
+                      {fmtDate(r.date)}
+                    </td>
+                    <td style={{ padding: "8px 10px" }}>
+                      <button onClick={() => onRemove(r.id)} style={{
+                        background: "#0f172a", border: "1px solid #334155",
+                        color: "#64748b", borderRadius: 6, padding: "4px 8px",
+                        fontSize: 14, cursor: "pointer",
+                      }}>×</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─── TABLEAU DE BORD ──────────────────────────────────────────────────────────
+function DashTab({ records, onRemove }) {
+  const traces = records.filter((r) => r.type === "trace");
+  const temps  = records.filter((r) => r.type === "temp");
+
+  const expired    = traces.filter((r) => dlcStatus(r.dlc)?.color === "#ef4444");
+  const warning    = traces.filter((r) => { const c = dlcStatus(r.dlc)?.color; return c === "#eab308" || c === "#f97316"; });
+  const tempAlerts = temps.filter((r) => r.entries?.some((e) => !e.ok));
+  const lastTemp   = temps[0];
+
+  const purgeExpired = () => expired.forEach((r) => onRemove(r.id));
+
+  return (
+    <div>
+      {/* KPIs */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
         {[
-          { id:"temp", icon:"🌡️", name:"Températures", count:`${temps.length} points`, badge: alertTemp||0 },
-          { id:"haccp", icon:"✅", name:"Plan HACCP", count:`${doneCount}/${tasks.length} tâches`, badge: tasks.length - doneCount },
-          { id:"stock", icon:"📦", name:"Stocks", count:`${stock.length} produits`, badge: lowStock||0 },
-          { id:"trace", icon:"🔍", name:"Traçabilité", count:`${initialTrace.length} lots`, badge: initialTrace.filter(t=>t.status!=="ok").length },
-          { id:"label", icon:"🏷️", name:"Étiquetage", count:"Créer étiquette", badge: 0 },
-        ].map(m => (
-          <div key={m.id} className={`module-btn`} onClick={() => onNavigate(m.id)}>
-            {m.badge > 0 && <div className="module-badge">{m.badge}</div>}
-            <span className="module-icon">{m.icon}</span>
-            <div className="module-name">{m.name}</div>
-            <div className="module-count">{m.count}</div>
+          { label: "Produits\nen stock",     value: traces.length,      color: "#38bdf8", border: "#0369a1" },
+          { label: "DLC\nexpirées",           value: expired.length,     color: "#ef4444", border: "#7f1d1d" },
+          { label: "DLC ≤ 3\njours",          value: warning.length,     color: "#eab308", border: "#713f12" },
+          { label: "Anomalies\ntempérature",  value: tempAlerts.length,  color: tempAlerts.length ? "#f97316" : "#22c55e", border: tempAlerts.length ? "#7c2d12" : "#14532d" },
+        ].map((k) => (
+          <div key={k.label} style={{
+            background: "#1e293b", border: `1px solid ${k.border}`,
+            borderRadius: 14, padding: "16px 12px", textAlign: "center",
+          }}>
+            <div style={{ fontSize: 36, fontWeight: 800, color: k.color, lineHeight: 1 }}>{k.value}</div>
+            <div style={{ fontSize: 11, color: "#64748b", marginTop: 6, whiteSpace: "pre-line", lineHeight: 1.4 }}>{k.label}</div>
           </div>
         ))}
       </div>
-    </div>
-  );
-}
 
-function TempScreen({ temps, setTemps }) {
-  const [showModal, setShowModal] = useState(false);
-  const [newTemp, setNewTemp] = useState({ name:"", zone:"", temp:"" });
-
-  const getStatus = (t) => {
-    if (t.temp < t.min || t.temp > t.max) return "bad";
-    if (Math.abs(t.temp - t.min) < 1 || Math.abs(t.temp - t.max) < 1) return "warn";
-    return "ok";
-  };
-
-  const addReading = () => {
-    if (!newTemp.name || !newTemp.temp) return;
-    const val = parseFloat(newTemp.temp);
-    setTemps(prev => [...prev, {
-      id: Date.now(), name: newTemp.name, zone: newTemp.zone || "Cuisine",
-      temp: val, min: -2, max: 5, icon: "🌡️", time: new Date().toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"}), status:"ok"
-    }]);
-    setNewTemp({ name:"", zone:"", temp:"" });
-    setShowModal(false);
-  };
-
-  return (
-    <div className="screen">
-      <div className="temp-list">
-        {temps.map(t => {
-          const s = getStatus(t);
-          return (
-            <div key={t.id} className="temp-item">
-              <div className={`temp-icon-wrap ${s}`}>{t.icon}</div>
-              <div className="temp-info">
-                <div className="temp-name">{t.name}</div>
-                <div className="temp-zone">{t.zone}</div>
-                <div className="temp-range">Min {t.min}° / Max {t.max}°C</div>
-              </div>
-              <div style={{textAlign:"right"}}>
-                <div className={`temp-val ${s}`}>{t.temp > 0 ? "+" : ""}{t.temp}°C</div>
-                <div className="temp-time">{t.time}</div>
-                {s !== "ok" && <div className="tag" style={{marginTop:4, background: s==="bad"?"#FF4D6D22":"#FFB54722", color: s==="bad"?"#FF4D6D":"#FFB547", fontSize:10}}>{s==="bad"?"⚠️ Hors norme":"⚡ Limite"}</div>}
-              </div>
-            </div>
-          );
-        })}
-        <div className="temp-add-btn" onClick={()=>setShowModal(true)}>
-          + Enregistrer une nouvelle mesure
-        </div>
-      </div>
-
-      {showModal && (
-        <div className="modal-overlay" onClick={()=>setShowModal(false)}>
-          <div className="modal" onClick={e=>e.stopPropagation()}>
-            <div className="modal-handle"/>
-            <div className="modal-title">Nouvelle mesure 🌡️</div>
-            <input className="modal-input" placeholder="Nom de l'équipement" value={newTemp.name} onChange={e=>setNewTemp({...newTemp,name:e.target.value})}/>
-            <input className="modal-input" placeholder="Zone (ex: Cuisine, Réserve...)" value={newTemp.zone} onChange={e=>setNewTemp({...newTemp,zone:e.target.value})}/>
-            <input className="modal-input" type="number" placeholder="Température (°C)" value={newTemp.temp} onChange={e=>setNewTemp({...newTemp,temp:e.target.value})}/>
-            <button className="modal-confirm" onClick={addReading}>✅ Enregistrer</button>
-            <button className="modal-cancel" onClick={()=>setShowModal(false)}>Annuler</button>
+      {/* Alertes DLC */}
+      {(expired.length > 0 || warning.length > 0) && (
+        <>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+            <h3 style={{ fontSize: 13, color: "#64748b", letterSpacing: 1, margin: 0 }}>⚠ ALERTES DLC</h3>
+            {expired.length > 0 && (
+              <button onClick={purgeExpired} style={{
+                background: "#450a0a", border: "1px solid #ef444444",
+                color: "#fca5a5", borderRadius: 8, padding: "5px 10px",
+                fontSize: 11, fontWeight: 600, cursor: "pointer",
+              }}>
+                🗑 Purger les expirés ({expired.length})
+              </button>
+            )}
           </div>
-        </div>
+          {[...expired, ...warning].map((r) => {
+            const st = dlcStatus(r.dlc);
+            return (
+              <div key={r.id} style={{
+                background: st.bg, border: `1px solid ${st.color}44`,
+                borderRadius: 12, padding: "10px 12px", marginBottom: 8,
+              }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "#f1f5f9", marginBottom: 2 }}>{r.product}</div>
+                    <div style={{ fontSize: 11, color: "#94a3b8" }}>
+                      DLC : {r.dlc ? new Date(r.dlc).toLocaleDateString("fr-FR") : "—"}
+                      {r.supplier && ` · ${r.supplier}`}
+                      {r.qty && ` · ${r.qty}`}
+                    </div>
+                  </div>
+                  <Badge color={st.color} bg={st.bg + "99"}>{st.label}</Badge>
+                </div>
+                <button onClick={() => onRemove(r.id)} style={{
+                  marginTop: 10, width: "100%", padding: "7px",
+                  background: "#0f172a", border: "1px solid #334155",
+                  borderRadius: 8, color: "#94a3b8", fontSize: 12,
+                  fontWeight: 600, cursor: "pointer",
+                }}>
+                  ✓ Produit utilisé — Retirer du stock
+                </button>
+              </div>
+            );
+          })}
+        </>
       )}
-    </div>
-  );
-}
 
-function HACCPScreen({ tasks, setTasks }) {
-  const toggle = (id) => setTasks(prev => prev.map(t => t.id===id ? {...t, done:!t.done} : t));
-  const doneCount = tasks.filter(t=>t.done).length;
-  const pct = Math.round((doneCount/tasks.length)*100);
-
-  return (
-    <div className="screen">
-      <div style={{padding:"0 16px 16px"}}>
-        <div style={{background:theme.card,borderRadius:14,padding:"14px 16px",border:`1px solid ${theme.border}`}}>
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
-            <span style={{fontSize:13,color:theme.textMuted}}>Avancement du jour</span>
-            <span style={{fontSize:16,fontWeight:700,color:theme.accent,fontFamily:"'JetBrains Mono'"}}>{pct}%</span>
-          </div>
-          <div style={{height:6,background:theme.border,borderRadius:3,overflow:"hidden"}}>
-            <div style={{height:6,width:`${pct}%`,background:theme.accent,borderRadius:3,transition:"width 0.5s"}}/>
-          </div>
-          <div style={{marginTop:8,fontSize:12,color:theme.textMuted}}>{doneCount} sur {tasks.length} tâches complétées</div>
-        </div>
-      </div>
-      <div className="task-list">
-        {["matin","midi","soir","continu"].map(freq => {
-          const freqTasks = tasks.filter(t=>t.freq===freq);
-          const labels = {matin:"🌅 Matin",midi:"☀️ Midi",soir:"🌙 Soir",continu:"🔄 Continu"};
-          return (
-            <div key={freq}>
-              <div style={{fontSize:12,fontWeight:600,color:theme.textMuted,paddingBottom:8,paddingTop:4,letterSpacing:"0.5px"}}>{labels[freq]}</div>
-              {freqTasks.map(t => (
-                <div key={t.id} className={`task-item ${t.done?"done":""}`} onClick={()=>toggle(t.id)} style={{marginBottom:8}}>
-                  <div className={`task-check ${t.done?"checked":""}`}>
-                    {t.done && <CheckIcon/>}
+      {/* Dernier relevé T° */}
+      {lastTemp && (
+        <>
+          <h3 style={{ fontSize: 13, color: "#64748b", margin: "16px 0 10px", letterSpacing: 1 }}>
+            🌡️ DERNIER RELEVÉ TEMPÉRATURE
+          </h3>
+          <Card>
+            <div style={{ fontSize: 11, color: "#64748b", marginBottom: 12 }}>{fmtDate(lastTemp.date)}</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              {lastTemp.entries.map((e) => (
+                <div key={e.id} style={{
+                  background: "#0f172a", borderRadius: 10, padding: "10px 12px",
+                  borderLeft: `3px solid ${e.ok ? "#22c55e" : "#ef4444"}`,
+                }}>
+                  <div style={{ fontSize: 11, color: "#64748b" }}>{e.label}</div>
+                  <div style={{ fontSize: 22, fontWeight: 800, color: e.ok ? "#22c55e" : "#ef4444" }}>
+                    {e.value}°C
                   </div>
-                  <div className="task-info">
-                    <div className={`task-name ${t.done?"done":""}`}>{t.name}</div>
-                    <div className="task-meta">{t.who}</div>
+                  <div style={{ fontSize: 10, color: e.ok ? "#22c55e88" : "#ef444488" }}>
+                    {e.ok ? "Conforme" : `Hors norme (${e.min}–${e.max}°C)`}
                   </div>
-                  <span className={`task-freq ${freq}`}>{freq}</span>
                 </div>
               ))}
             </div>
-          );
-        })}
-      </div>
+          </Card>
+        </>
+      )}
+
+      {/* Tableau stock trié par DLC */}
+      {traces.length > 0 && (
+        <>
+          <h3 style={{ fontSize: 13, color: "#64748b", margin: "16px 0 10px", letterSpacing: 1 }}>
+            📋 STOCK COMPLET — trié par DLC
+          </h3>
+          <div style={{ overflowX: "auto", borderRadius: 12, border: "1px solid #334155" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, minWidth: 400 }}>
+              <thead>
+                <tr style={{ background: "#0f172a" }}>
+                  {["Produit", "DLC", "Statut", "Qté", "Action"].map((h) => (
+                    <th key={h} style={{
+                      padding: "10px 10px", textAlign: "left", color: "#64748b",
+                      fontWeight: 600, whiteSpace: "nowrap", borderBottom: "1px solid #334155",
+                    }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {[...traces].sort((a, b) => {
+                  if (!a.dlc && !b.dlc) return 0;
+                  if (!a.dlc) return 1;
+                  if (!b.dlc) return -1;
+                  return new Date(a.dlc) - new Date(b.dlc);
+                }).map((r, i) => {
+                  const st = dlcStatus(r.dlc);
+                  return (
+                    <tr key={r.id} style={{ background: i % 2 === 0 ? "#1e293b" : "#162032" }}>
+                      <td style={{ padding: "10px 10px", fontWeight: 600, color: "#f1f5f9", maxWidth: 140 }}>
+                        <div style={{ fontSize: 12 }}>{r.product}</div>
+                        {r.supplier && <div style={{ fontSize: 10, color: "#475569", marginTop: 2 }}>{r.supplier}</div>}
+                      </td>
+                      <td style={{ padding: "10px 10px", color: st?.color ?? "#94a3b8", whiteSpace: "nowrap" }}>
+                        {r.dlc ? new Date(r.dlc).toLocaleDateString("fr-FR") : "—"}
+                      </td>
+                      <td style={{ padding: "8px 10px" }}>
+                        {st ? <Badge color={st.color} bg={st.bg}>{st.label}</Badge> : <span style={{ color: "#475569" }}>—</span>}
+                      </td>
+                      <td style={{ padding: "10px 10px", color: "#94a3b8" }}>{r.qty || "—"}</td>
+                      <td style={{ padding: "8px 10px" }}>
+                        <button onClick={() => onRemove(r.id)} style={{
+                          background: "#0f172a", border: "1px solid #334155",
+                          color: "#22c55e", borderRadius: 6, padding: "5px 8px",
+                          fontSize: 11, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap",
+                        }}>✓ Utilisé</button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+
+      {records.length === 0 && (
+        <div style={{ textAlign: "center", padding: "60px 20px", color: "#475569" }}>
+          <div style={{ fontSize: 52 }}>📊</div>
+          <p style={{ marginTop: 16, fontSize: 15, fontWeight: 600, color: "#64748b" }}>Aucune donnée encore</p>
+          <p style={{ fontSize: 13, marginTop: 6 }}>Commencez par saisir des températures ou des produits</p>
+        </div>
+      )}
     </div>
   );
 }
 
-function StockScreen({ stock }) {
-  const [filter, setFilter] = useState("Tous");
-  const cats = ["Tous", ...new Set(stock.map(s=>s.cat))];
-  const filtered = filter==="Tous" ? stock : stock.filter(s=>s.cat===filter);
+// ─── SCAN ÉTIQUETTES ──────────────────────────────────────────────────────────
+const SCAN_KEY = "haccp_scan_labels";
+const API_KEY_KEY = "haccp_api_key";
 
-  const expColor = (date) => {
-    const d = new Date(date); const today = new Date();
-    const diff = (d - today) / (1000*60*60*24);
-    if (diff < 1) return "urgent";
-    return "ok";
+const useScanStorage = () => {
+  const [labels, setLabels] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(SCAN_KEY) || "[]"); } catch { return []; }
+  });
+  const save = (next) => { setLabels(next); localStorage.setItem(SCAN_KEY, JSON.stringify(next)); };
+  const addLabel = (l) => save([{ ...l, id: Date.now() }, ...labels]);
+  const removeLabel = (id) => save(labels.filter((l) => l.id !== id));
+  return { labels, addLabel, removeLabel };
+};
+
+function PhotoLabelScreen() {
+  const { labels, addLabel, removeLabel } = useScanStorage();
+  const [view, setView] = useState("scan"); // "scan" | "table"
+  const [apiKey, setApiKey] = useState(() => localStorage.getItem(API_KEY_KEY) || "");
+  const [showKeyModal, setShowKeyModal] = useState(false);
+  const [keyDraft, setKeyDraft] = useState("");
+  const [preview, setPreview] = useState(null);
+  const [b64, setB64] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [extracted, setExtracted] = useState(null);
+  const [draft, setDraft] = useState(null);
+  const [error, setError] = useState(null);
+  const inputRef = useRef();
+
+  const onFile = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setExtracted(null); setDraft(null); setError(null);
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const result = ev.target.result;
+      setPreview(result);
+      setB64(result.split(",")[1]);
+    };
+    reader.readAsDataURL(file);
   };
 
-  return (
-    <div className="screen">
-      <div className="stock-filter">
-        {cats.map(c => (
-          <div key={c} className={`filter-chip ${filter===c?"active":""}`} onClick={()=>setFilter(c)}>{c}</div>
-        ))}
-      </div>
-      <div className="stock-list">
-        {filtered.map(s => (
-          <div key={s.id} className="stock-item">
-            <div className="stock-top">
-              <div className="stock-name">{s.name}</div>
-              <div className={`stock-qty ${s.level}`}>{s.qty} {s.unit}</div>
-            </div>
-            <div className="stock-bar-bg">
-              <div className={`stock-bar ${s.level}`} style={{width:`${Math.round((s.qty/s.max)*100)}%`}}/>
-            </div>
-            <div className="stock-meta">
-              <span className="stock-cat">📂 {s.cat}</span>
-              <span className={`stock-exp ${expColor(s.exp)}`}>
-                {expColor(s.exp)==="urgent" ? "⚠️ " : "📅 "}DLC : {new Date(s.exp).toLocaleDateString("fr-FR")}
-              </span>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
+  const analyse = async () => {
+    if (!b64) return;
+    if (!apiKey) { setShowKeyModal(true); return; }
+    setLoading(true); setError(null);
+    try {
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+          "anthropic-dangerous-direct-browser-access": "true",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "claude-opus-4-6",
+          max_tokens: 512,
+          messages: [{
+            role: "user",
+            content: [
+              {
+                type: "image",
+                source: { type: "base64", media_type: "image/jpeg", data: b64 },
+              },
+              {
+                type: "text",
+                text: `Tu es un assistant HACCP. Analyse cette étiquette alimentaire et extrais uniquement un JSON valide (sans markdown) avec ces champs exacts :
+{
+  "nom": "...",
+  "dateFabrication": "YYYY-MM-DD ou vide",
+  "dlc": "YYYY-MM-DD ou vide",
+  "lot": "...",
+  "allergenes": "...",
+  "responsable": "...",
+  "temperature": "...",
+  "poids": "..."
 }
+Si une information est absente, laisse la valeur vide "". Réponds UNIQUEMENT avec le JSON.`,
+              },
+            ],
+          }],
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.error?.message || `Erreur API ${res.status}`);
+      }
+      const data = await res.json();
+      const text = data.content?.[0]?.text || "";
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) throw new Error("Réponse inattendue de l'IA");
+      const parsed = JSON.parse(jsonMatch[0]);
+      setExtracted(parsed);
+      setDraft(parsed);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-function LabelScreen() {
-  const [form, setForm] = useState({
-    nom:"Tartare de bœuf", prep:"08/03/2026", use:"09/03/2026",
-    lot:"LOT-2026-0308-001", allergens:"Gluten, Moutarde", chef:"Chef Martin"
+  const saveLabel = () => {
+    if (!draft) return;
+    addLabel({ ...draft, scannedAt: new Date().toISOString(), preview });
+    setPreview(null); setB64(null); setExtracted(null); setDraft(null);
+    if (inputRef.current) inputRef.current.value = "";
+    setView("table");
+  };
+
+  const saveKey = () => {
+    localStorage.setItem(API_KEY_KEY, keyDraft);
+    setApiKey(keyDraft);
+    setShowKeyModal(false);
+    setKeyDraft("");
+  };
+
+  const dlcBadge = (dlcStr) => {
+    if (!dlcStr) return null;
+    const s = dlcStatus(dlcStr);
+    if (!s) return null;
+    return <span style={{ display:"inline-block", padding:"2px 8px", borderRadius:20, fontSize:11, fontWeight:600, color:s.color, background:s.bg }}>{s.label}</span>;
+  };
+
+  const btnStyle = (active) => ({
+    flex:1, padding:"9px 0", border:"none", cursor:"pointer", fontWeight:700, fontSize:13,
+    background: active ? "#38bdf8" : "#1e293b",
+    color: active ? "#0f172a" : "#64748b",
+    borderRadius: active ? 8 : 0,
+    transition: "all .15s",
   });
 
   return (
-    <div className="screen">
-      <div className="label-form">
-        {[
-          {key:"nom",label:"Nom du plat",placeholder:"Ex: Tartare de bœuf"},
-          {key:"prep",label:"Date de préparation",placeholder:"JJ/MM/AAAA"},
-          {key:"use",label:"À utiliser avant",placeholder:"JJ/MM/AAAA"},
-          {key:"lot",label:"N° de lot",placeholder:"Ex: LOT-2026-..."},
-          {key:"allergens",label:"Allergènes",placeholder:"Ex: Gluten, Lait, Œufs..."},
-          {key:"chef",label:"Responsable",placeholder:"Nom du chef"},
-        ].map(f => (
-          <div key={f.key} className="form-field">
-            <div className="form-label">{f.label}</div>
-            <input className="form-input" placeholder={f.placeholder} value={form[f.key]} onChange={e=>setForm({...form,[f.key]:e.target.value})}/>
-          </div>
-        ))}
-      </div>
-
-      <div style={{padding:"16px 16px 0",fontWeight:700,fontSize:13,color:theme.textMuted,textTransform:"uppercase",letterSpacing:"1px"}}>Aperçu étiquette</div>
-      <div className="label-preview">
-        <div className="lp-title">🏷️ Étiquette traçabilité</div>
-        <div className="lp-name">{form.nom || "—"}</div>
-        <div className="lp-info">
-          <div className="lp-row">Préparé le : <span>{form.prep || "—"}</span></div>
-          <div className="lp-row">À utiliser avant : <span>{form.use || "—"}</span></div>
-          <div className="lp-row">Responsable : <span>{form.chef || "—"}</span></div>
+    <div>
+      {/* Clé API banner */}
+      {!apiKey && (
+        <div style={{ background:"#1e3a5f", border:"1px solid #2563eb", borderRadius:10, padding:"10px 14px", marginBottom:14, display:"flex", alignItems:"center", justifyContent:"space-between", gap:8 }}>
+          <span style={{ fontSize:13, color:"#93c5fd" }}>🔑 Clé API Anthropic requise</span>
+          <button onClick={() => { setKeyDraft(""); setShowKeyModal(true); }} style={{ background:"#2563eb", color:"#fff", border:"none", borderRadius:6, padding:"5px 12px", fontSize:12, fontWeight:700, cursor:"pointer" }}>Configurer</button>
         </div>
-        {form.allergens && <div className="lp-allergens">⚠️ Contient : {form.allergens}</div>}
-        <div className="lp-lot">{form.lot || "LOT-—"}</div>
+      )}
+      {apiKey && (
+        <div style={{ display:"flex", justifyContent:"flex-end", marginBottom:10 }}>
+          <button onClick={() => { setKeyDraft(apiKey); setShowKeyModal(true); }} style={{ background:"#1e293b", border:"1px solid #334155", color:"#64748b", borderRadius:6, padding:"4px 10px", fontSize:11, cursor:"pointer" }}>🔑 Clé API</button>
+        </div>
+      )}
+
+      {/* Onglets Scanner / Tableau */}
+      <div style={{ display:"flex", background:"#1e293b", borderRadius:10, padding:3, marginBottom:16, border:"1px solid #334155" }}>
+        <button style={btnStyle(view==="scan")} onClick={() => setView("scan")}>📷 Scanner</button>
+        <button style={btnStyle(view==="table")} onClick={() => setView("table")}>
+          📋 Tableau {labels.length > 0 && <span style={{ background:"#38bdf8", color:"#0f172a", borderRadius:20, padding:"1px 7px", fontSize:11, marginLeft:4 }}>{labels.length}</span>}
+        </button>
       </div>
 
-      <button className="print-btn">🖨️ Imprimer l'étiquette</button>
-      <div style={{height:16}}/>
-    </div>
-  );
-}
-
-function TraceScreen() {
-  return (
-    <div className="screen">
-      <div className="trace-list">
-        {initialTrace.map(t => (
-          <div key={t.id} className="trace-item">
-            <div className="trace-header">
-              <div className="trace-name">{t.name}</div>
-              <div className={`trace-status ${t.status}`}>
-                {t.status==="ok"?"✅ Conforme":t.status==="warn"?"⚡ À surveiller":"⛔ Non conforme"}
-              </div>
-            </div>
-            <div className="trace-details">
-              <div className="trace-detail">Fournisseur : <span>{t.fournisseur}</span></div>
-              <div className="trace-detail">Poids : <span>{t.poids}</span></div>
-              <div className="trace-detail">Réception : <span>{t.reception}</span></div>
-              <div className="trace-detail">DLC : <span style={{color: t.status==="bad"?theme.danger:t.status==="warn"?theme.warning:theme.text}}>{t.ddm}</span></div>
-              <div className="trace-detail" style={{gridColumn:"1/-1"}}>Origine : <span>{t.origine}</span></div>
-            </div>
-            <div className="trace-lot">📦 {t.lot}</div>
+      {/* ── VUE SCANNER ── */}
+      {view === "scan" && (
+        <div>
+          <div
+            onClick={() => inputRef.current?.click()}
+            style={{
+              border: "2px dashed #334155", borderRadius:14, padding:"28px 20px",
+              textAlign:"center", cursor:"pointer", marginBottom:14,
+              background: preview ? "none" : "#1e293b",
+            }}
+          >
+            {preview
+              ? <img src={preview} alt="étiquette" style={{ maxWidth:"100%", borderRadius:10, maxHeight:280, objectFit:"contain" }} />
+              : <>
+                  <div style={{ fontSize:48, marginBottom:10 }}>📷</div>
+                  <div style={{ color:"#64748b", fontSize:14 }}>Appuyez pour prendre une photo</div>
+                  <div style={{ color:"#475569", fontSize:12, marginTop:4 }}>ou importer depuis la galerie</div>
+                </>
+            }
           </div>
-        ))}
-      </div>
+          <input ref={inputRef} type="file" accept="image/*" capture="environment" style={{ display:"none" }} onChange={onFile} />
+
+          {preview && !extracted && (
+            <button
+              onClick={analyse}
+              disabled={loading}
+              style={{
+                width:"100%", padding:"13px 0", borderRadius:10, border:"none",
+                background: loading ? "#1e293b" : "linear-gradient(135deg,#38bdf8,#6366f1)",
+                color: loading ? "#64748b" : "#fff", fontWeight:700, fontSize:15,
+                cursor: loading ? "not-allowed" : "pointer", marginBottom:14,
+              }}
+            >
+              {loading ? "⏳ Analyse en cours…" : "🔍 Analyser l'étiquette"}
+            </button>
+          )}
+
+          {error && (
+            <div style={{ background:"#450a0a", border:"1px solid #ef4444", borderRadius:10, padding:"12px 14px", marginBottom:14, color:"#fca5a5", fontSize:13 }}>
+              ⚠ {error}
+            </div>
+          )}
+
+          {draft && (
+            <div style={{ background:"#1e293b", border:"1px solid #334155", borderRadius:14, padding:"14px", marginBottom:14 }}>
+              <div style={{ fontSize:13, fontWeight:700, color:"#38bdf8", marginBottom:12 }}>✅ Données extraites — vérifiez et éditez</div>
+              {[
+                ["nom","Produit","text"],
+                ["dateFabrication","Date fabrication","date"],
+                ["dlc","DLC / DDM","date"],
+                ["lot","N° de lot","text"],
+                ["allergenes","Allergènes","text"],
+                ["responsable","Responsable","text"],
+                ["temperature","Température","text"],
+                ["poids","Poids","text"],
+              ].map(([key, label, type]) => (
+                <div key={key} style={{ marginBottom:10 }}>
+                  <div style={{ fontSize:11, color:"#64748b", fontWeight:600, marginBottom:3 }}>{label}</div>
+                  <input
+                    type={type}
+                    value={draft[key] || ""}
+                    onChange={(e) => setDraft({ ...draft, [key]: e.target.value })}
+                    style={{
+                      width:"100%", boxSizing:"border-box",
+                      background:"#0f172a", border:"1px solid #334155", color:"#f1f5f9",
+                      borderRadius:7, padding:"8px 10px", fontSize:13,
+                    }}
+                  />
+                </div>
+              ))}
+              <button
+                onClick={saveLabel}
+                style={{ width:"100%", padding:"12px 0", borderRadius:10, border:"none", background:"#22c55e", color:"#0f172a", fontWeight:700, fontSize:14, cursor:"pointer", marginTop:4 }}
+              >
+                💾 Sauvegarder dans le tableau
+              </button>
+            </div>
+          )}
+
+          {preview && (
+            <button
+              onClick={() => { setPreview(null); setB64(null); setExtracted(null); setDraft(null); setError(null); if (inputRef.current) inputRef.current.value=""; }}
+              style={{ width:"100%", padding:"10px 0", borderRadius:10, border:"1px solid #334155", background:"none", color:"#64748b", fontSize:13, cursor:"pointer" }}
+            >
+              🗑 Recommencer
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* ── VUE TABLEAU ── */}
+      {view === "table" && (
+        <div>
+          {labels.length === 0 ? (
+            <div style={{ textAlign:"center", padding:"60px 20px", color:"#475569" }}>
+              <div style={{ fontSize:52 }}>📷</div>
+              <p style={{ marginTop:16, fontSize:15, fontWeight:600, color:"#64748b" }}>Aucune étiquette scannée</p>
+              <p style={{ fontSize:13, marginTop:6 }}>Utilisez l'onglet Scanner pour photographier une étiquette</p>
+              <button onClick={() => setView("scan")} style={{ marginTop:16, padding:"10px 22px", borderRadius:10, border:"none", background:"#38bdf8", color:"#0f172a", fontWeight:700, fontSize:13, cursor:"pointer" }}>
+                📷 Scanner une étiquette
+              </button>
+            </div>
+          ) : (
+            <div>
+              {labels.map((l) => {
+                const status = dlcStatus(l.dlc);
+                return (
+                  <div key={l.id} style={{ background:"#1e293b", border:"1px solid #334155", borderRadius:12, padding:"12px 14px", marginBottom:10 }}>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:8, marginBottom:8 }}>
+                      <div style={{ fontWeight:700, fontSize:14, color:"#f1f5f9", flex:1 }}>{l.nom || "Produit inconnu"}</div>
+                      <button onClick={() => removeLabel(l.id)} style={{ background:"#450a0a", border:"1px solid #ef444444", color:"#fca5a5", borderRadius:6, padding:"3px 8px", fontSize:11, cursor:"pointer", flexShrink:0 }}>✕</button>
+                    </div>
+                    {status && <div style={{ marginBottom:8 }}>{dlcBadge(l.dlc)}</div>}
+                    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"4px 12px", fontSize:12 }}>
+                      {l.dlc && <div><span style={{ color:"#64748b" }}>DLC: </span><span style={{ color:"#f1f5f9" }}>{l.dlc}</span></div>}
+                      {l.lot && <div><span style={{ color:"#64748b" }}>Lot: </span><span style={{ color:"#f1f5f9" }}>{l.lot}</span></div>}
+                      {l.dateFabrication && <div><span style={{ color:"#64748b" }}>Fab.: </span><span style={{ color:"#f1f5f9" }}>{l.dateFabrication}</span></div>}
+                      {l.poids && <div><span style={{ color:"#64748b" }}>Poids: </span><span style={{ color:"#f1f5f9" }}>{l.poids}</span></div>}
+                      {l.temperature && <div><span style={{ color:"#64748b" }}>Temp.: </span><span style={{ color:"#f1f5f9" }}>{l.temperature}</span></div>}
+                      {l.responsable && <div><span style={{ color:"#64748b" }}>Resp.: </span><span style={{ color:"#f1f5f9" }}>{l.responsable}</span></div>}
+                    </div>
+                    {l.allergenes && (
+                      <div style={{ marginTop:8, padding:"6px 10px", background:"#422006", borderRadius:6, fontSize:12, color:"#fdba74" }}>
+                        ⚠ Allergènes: {l.allergenes}
+                      </div>
+                    )}
+                    <div style={{ marginTop:6, fontSize:11, color:"#334155" }}>
+                      Scanné le {new Date(l.scannedAt).toLocaleDateString("fr-FR", { day:"2-digit", month:"2-digit", year:"numeric", hour:"2-digit", minute:"2-digit" })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── MODAL CLÉ API ── */}
+      {showKeyModal && (
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.7)", zIndex:100, display:"flex", alignItems:"center", justifyContent:"center", padding:20 }}>
+          <div style={{ background:"#1e293b", border:"1px solid #334155", borderRadius:16, padding:24, width:"100%", maxWidth:380 }}>
+            <div style={{ fontSize:16, fontWeight:700, marginBottom:6 }}>🔑 Clé API Anthropic</div>
+            <div style={{ fontSize:12, color:"#64748b", marginBottom:16 }}>
+              Votre clé est stockée localement sur cet appareil uniquement.
+            </div>
+            <input
+              type="password"
+              placeholder="sk-ant-api03-..."
+              value={keyDraft}
+              onChange={(e) => setKeyDraft(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && keyDraft && saveKey()}
+              autoFocus
+              style={{ width:"100%", boxSizing:"border-box", background:"#0f172a", border:"1px solid #334155", color:"#f1f5f9", borderRadius:8, padding:"10px 12px", fontSize:13, marginBottom:14 }}
+            />
+            <div style={{ display:"flex", gap:10 }}>
+              <button onClick={() => setShowKeyModal(false)} style={{ flex:1, padding:"10px 0", borderRadius:8, border:"1px solid #334155", background:"none", color:"#64748b", cursor:"pointer", fontSize:13 }}>Annuler</button>
+              <button onClick={saveKey} disabled={!keyDraft} style={{ flex:2, padding:"10px 0", borderRadius:8, border:"none", background: keyDraft ? "#38bdf8" : "#1e293b", color: keyDraft ? "#0f172a" : "#475569", fontWeight:700, cursor: keyDraft ? "pointer" : "not-allowed", fontSize:13 }}>Enregistrer</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 // ─── APP ROOT ─────────────────────────────────────────────────────────────────
+const TABS = [
+  { id: "dash", label: "Tableau", icon: "📊" },
+  { id: "temp", label: "Temp.", icon: "🌡️" },
+  { id: "trace", label: "Traça", icon: "📋" },
+  { id: "photo", label: "Photos", icon: "📷" },
+  { id: "scan",  label: "Scan",   icon: "🏷️" },
+];
+
 export default function App() {
-  const [screen, setScreen] = useState("home");
-  const [temps, setTemps] = useState(initialTemps);
-  const [tasks, setTasks] = useState(initialTasks);
-  const [stock] = useState(initialStock);
+  const [tab, setTab] = useState("dash");
+  const { records, add, remove } = useStorage();
 
-  const now = new Date();
-  const timeStr = now.toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"});
+  const byType = (t) => records.filter((r) => r.type === t);
 
-  const navItems = [
-    {id:"home",icon:"🏠",label:"Accueil"},
-    {id:"temp",icon:"🌡️",label:"Temp."},
-    {id:"haccp",icon:"✅",label:"HACCP"},
-    {id:"stock",icon:"📦",label:"Stocks"},
-    {id:"label",icon:"🏷️",label:"Étiq."},
-    {id:"trace",icon:"🔍",label:"Traça."},
-  ];
-
-  const screenTitles = {
-    home:"Accueil", temp:"Températures", haccp:"Plan HACCP",
-    stock:"Gestion des stocks", label:"Étiquetage", trace:"Traçabilité"
-  };
+  const alertCount = records.filter((r) => {
+    if (r.type === "trace") {
+      const c = dlcStatus(r.dlc)?.color;
+      return c === "#ef4444" || c === "#eab308" || c === "#f97316";
+    }
+    if (r.type === "temp") return r.entries?.some((e) => !e.ok);
+    return false;
+  }).length;
 
   return (
-    <>
-      <style>{fonts + css}</style>
-      <div className="app">
-        <div className="status-bar">
-          <span className="status-time">{timeStr}</span>
-          <div className="status-icons">
-            <span style={{fontSize:12}}>●●●●</span>
-            <span style={{fontSize:12}}>WiFi</span>
-            <span style={{fontSize:14}}>🔋</span>
-          </div>
-        </div>
-
-        {screen !== "home" && (
-          <div style={{display:"flex",alignItems:"center",gap:12,padding:"8px 16px 12px"}}>
-            <div style={{fontSize:22,cursor:"pointer"}} onClick={()=>setScreen("home")}>←</div>
-            <div style={{fontSize:18,fontWeight:700}}>{screenTitles[screen]}</div>
-          </div>
-        )}
-
-        <div className="scroll-area">
-          {screen === "home" && <HomeScreen temps={temps} tasks={tasks} stock={stock} onNavigate={setScreen}/>}
-          {screen === "temp" && <TempScreen temps={temps} setTemps={setTemps}/>}
-          {screen === "haccp" && <HACCPScreen tasks={tasks} setTasks={setTasks}/>}
-          {screen === "stock" && <StockScreen stock={stock}/>}
-          {screen === "label" && <LabelScreen/>}
-          {screen === "trace" && <TraceScreen/>}
-        </div>
-
-        <div className="bottom-nav">
-          {navItems.map(n => (
-            <div key={n.id} className={`nav-item ${screen===n.id?"active":""}`} onClick={()=>setScreen(n.id)}>
-              <span className="nav-icon">{n.icon}</span>
-              <span className="nav-label">{n.label}</span>
+    <div style={{
+      maxWidth: 480, margin: "0 auto", minHeight: "100vh",
+      background: "#0f172a", color: "#f1f5f9",
+      fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+      paddingBottom: 72,
+    }}>
+      {/* Header */}
+      <div style={{
+        padding: "20px 20px 16px",
+        background: "linear-gradient(160deg, #1e293b 0%, #0f172a 100%)",
+        borderBottom: "1px solid #1e293b",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div>
+            <div style={{ fontSize: 10, color: "#38bdf8", fontWeight: 700, letterSpacing: 2, marginBottom: 4 }}>
+              HACCP NUMÉRIQUE
             </div>
-          ))}
+            <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: -0.5 }}>Restaurant</div>
+            <div style={{ fontSize: 12, color: "#475569", marginTop: 2 }}>
+              {new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}
+            </div>
+          </div>
+          {alertCount > 0 && (
+            <div style={{
+              background: "#7f1d1d", color: "#fca5a5",
+              borderRadius: 20, padding: "6px 14px",
+              fontSize: 12, fontWeight: 700, border: "1px solid #ef444444",
+            }}>
+              ⚠ {alertCount} alerte{alertCount > 1 ? "s" : ""}
+            </div>
+          )}
         </div>
       </div>
-    </>
+
+      {/* Contenu */}
+      <div style={{ padding: "16px 14px" }}>
+        {tab === "dash"  && <DashTab records={records} onRemove={remove} />}
+        {tab === "temp"  && <TempTab records={byType("temp")} onAdd={add} />}
+        {tab === "trace" && <TraceTab records={byType("trace")} onAdd={add} onRemove={remove} />}
+        {tab === "photo" && <PhotoTab records={byType("photo")} onAdd={add} onRemove={remove} />}
+        {tab === "scan"  && <PhotoLabelScreen />}
+      </div>
+
+      {/* Barre de navigation fixe */}
+      <div style={{
+        position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)",
+        width: "100%", maxWidth: 480,
+        background: "#1e293b", borderTop: "1px solid #334155",
+        display: "flex",
+      }}>
+        {TABS.map((t) => {
+          const active = tab === t.id;
+          return (
+            <button key={t.id} onClick={() => setTab(t.id)} style={{
+              flex: 1, padding: "10px 4px 12px", background: "none", border: "none",
+              color: active ? "#38bdf8" : "#475569",
+              display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
+              cursor: "pointer", position: "relative",
+            }}>
+              {t.id === "dash" && alertCount > 0 && (
+                <div style={{
+                  position: "absolute", top: 6, right: "calc(50% - 18px)",
+                  width: 8, height: 8, borderRadius: "50%", background: "#ef4444",
+                }} />
+              )}
+              <span style={{ fontSize: 20 }}>{t.icon}</span>
+              <span style={{ fontSize: 10, fontWeight: active ? 700 : 400 }}>{t.label}</span>
+              {active && <div style={{ width: 20, height: 2, background: "#38bdf8", borderRadius: 2 }} />}
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
