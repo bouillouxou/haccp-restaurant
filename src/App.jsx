@@ -587,12 +587,332 @@ function DashTab({ records, onRemove }) {
   );
 }
 
+// ─── SCAN ÉTIQUETTES ──────────────────────────────────────────────────────────
+const SCAN_KEY = "haccp_scan_labels";
+const API_KEY_KEY = "haccp_api_key";
+
+const useScanStorage = () => {
+  const [labels, setLabels] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(SCAN_KEY) || "[]"); } catch { return []; }
+  });
+  const save = (next) => { setLabels(next); localStorage.setItem(SCAN_KEY, JSON.stringify(next)); };
+  const addLabel = (l) => save([{ ...l, id: Date.now() }, ...labels]);
+  const removeLabel = (id) => save(labels.filter((l) => l.id !== id));
+  return { labels, addLabel, removeLabel };
+};
+
+function PhotoLabelScreen() {
+  const { labels, addLabel, removeLabel } = useScanStorage();
+  const [view, setView] = useState("scan"); // "scan" | "table"
+  const [apiKey, setApiKey] = useState(() => localStorage.getItem(API_KEY_KEY) || "");
+  const [showKeyModal, setShowKeyModal] = useState(false);
+  const [keyDraft, setKeyDraft] = useState("");
+  const [preview, setPreview] = useState(null);
+  const [b64, setB64] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [extracted, setExtracted] = useState(null);
+  const [draft, setDraft] = useState(null);
+  const [error, setError] = useState(null);
+  const inputRef = useRef();
+
+  const onFile = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setExtracted(null); setDraft(null); setError(null);
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const result = ev.target.result;
+      setPreview(result);
+      setB64(result.split(",")[1]);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const analyse = async () => {
+    if (!b64) return;
+    if (!apiKey) { setShowKeyModal(true); return; }
+    setLoading(true); setError(null);
+    try {
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+          "anthropic-dangerous-direct-browser-access": "true",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "claude-opus-4-6",
+          max_tokens: 512,
+          messages: [{
+            role: "user",
+            content: [
+              {
+                type: "image",
+                source: { type: "base64", media_type: "image/jpeg", data: b64 },
+              },
+              {
+                type: "text",
+                text: `Tu es un assistant HACCP. Analyse cette étiquette alimentaire et extrais uniquement un JSON valide (sans markdown) avec ces champs exacts :
+{
+  "nom": "...",
+  "dateFabrication": "YYYY-MM-DD ou vide",
+  "dlc": "YYYY-MM-DD ou vide",
+  "lot": "...",
+  "allergenes": "...",
+  "responsable": "...",
+  "temperature": "...",
+  "poids": "..."
+}
+Si une information est absente, laisse la valeur vide "". Réponds UNIQUEMENT avec le JSON.`,
+              },
+            ],
+          }],
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.error?.message || `Erreur API ${res.status}`);
+      }
+      const data = await res.json();
+      const text = data.content?.[0]?.text || "";
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) throw new Error("Réponse inattendue de l'IA");
+      const parsed = JSON.parse(jsonMatch[0]);
+      setExtracted(parsed);
+      setDraft(parsed);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const saveLabel = () => {
+    if (!draft) return;
+    addLabel({ ...draft, scannedAt: new Date().toISOString(), preview });
+    setPreview(null); setB64(null); setExtracted(null); setDraft(null);
+    if (inputRef.current) inputRef.current.value = "";
+    setView("table");
+  };
+
+  const saveKey = () => {
+    localStorage.setItem(API_KEY_KEY, keyDraft);
+    setApiKey(keyDraft);
+    setShowKeyModal(false);
+    setKeyDraft("");
+  };
+
+  const dlcBadge = (dlcStr) => {
+    if (!dlcStr) return null;
+    const s = dlcStatus(dlcStr);
+    if (!s) return null;
+    return <span style={{ display:"inline-block", padding:"2px 8px", borderRadius:20, fontSize:11, fontWeight:600, color:s.color, background:s.bg }}>{s.label}</span>;
+  };
+
+  const btnStyle = (active) => ({
+    flex:1, padding:"9px 0", border:"none", cursor:"pointer", fontWeight:700, fontSize:13,
+    background: active ? "#38bdf8" : "#1e293b",
+    color: active ? "#0f172a" : "#64748b",
+    borderRadius: active ? 8 : 0,
+    transition: "all .15s",
+  });
+
+  return (
+    <div>
+      {/* Clé API banner */}
+      {!apiKey && (
+        <div style={{ background:"#1e3a5f", border:"1px solid #2563eb", borderRadius:10, padding:"10px 14px", marginBottom:14, display:"flex", alignItems:"center", justifyContent:"space-between", gap:8 }}>
+          <span style={{ fontSize:13, color:"#93c5fd" }}>🔑 Clé API Anthropic requise</span>
+          <button onClick={() => { setKeyDraft(""); setShowKeyModal(true); }} style={{ background:"#2563eb", color:"#fff", border:"none", borderRadius:6, padding:"5px 12px", fontSize:12, fontWeight:700, cursor:"pointer" }}>Configurer</button>
+        </div>
+      )}
+      {apiKey && (
+        <div style={{ display:"flex", justifyContent:"flex-end", marginBottom:10 }}>
+          <button onClick={() => { setKeyDraft(apiKey); setShowKeyModal(true); }} style={{ background:"#1e293b", border:"1px solid #334155", color:"#64748b", borderRadius:6, padding:"4px 10px", fontSize:11, cursor:"pointer" }}>🔑 Clé API</button>
+        </div>
+      )}
+
+      {/* Onglets Scanner / Tableau */}
+      <div style={{ display:"flex", background:"#1e293b", borderRadius:10, padding:3, marginBottom:16, border:"1px solid #334155" }}>
+        <button style={btnStyle(view==="scan")} onClick={() => setView("scan")}>📷 Scanner</button>
+        <button style={btnStyle(view==="table")} onClick={() => setView("table")}>
+          📋 Tableau {labels.length > 0 && <span style={{ background:"#38bdf8", color:"#0f172a", borderRadius:20, padding:"1px 7px", fontSize:11, marginLeft:4 }}>{labels.length}</span>}
+        </button>
+      </div>
+
+      {/* ── VUE SCANNER ── */}
+      {view === "scan" && (
+        <div>
+          <div
+            onClick={() => inputRef.current?.click()}
+            style={{
+              border: "2px dashed #334155", borderRadius:14, padding:"28px 20px",
+              textAlign:"center", cursor:"pointer", marginBottom:14,
+              background: preview ? "none" : "#1e293b",
+            }}
+          >
+            {preview
+              ? <img src={preview} alt="étiquette" style={{ maxWidth:"100%", borderRadius:10, maxHeight:280, objectFit:"contain" }} />
+              : <>
+                  <div style={{ fontSize:48, marginBottom:10 }}>📷</div>
+                  <div style={{ color:"#64748b", fontSize:14 }}>Appuyez pour prendre une photo</div>
+                  <div style={{ color:"#475569", fontSize:12, marginTop:4 }}>ou importer depuis la galerie</div>
+                </>
+            }
+          </div>
+          <input ref={inputRef} type="file" accept="image/*" capture="environment" style={{ display:"none" }} onChange={onFile} />
+
+          {preview && !extracted && (
+            <button
+              onClick={analyse}
+              disabled={loading}
+              style={{
+                width:"100%", padding:"13px 0", borderRadius:10, border:"none",
+                background: loading ? "#1e293b" : "linear-gradient(135deg,#38bdf8,#6366f1)",
+                color: loading ? "#64748b" : "#fff", fontWeight:700, fontSize:15,
+                cursor: loading ? "not-allowed" : "pointer", marginBottom:14,
+              }}
+            >
+              {loading ? "⏳ Analyse en cours…" : "🔍 Analyser l'étiquette"}
+            </button>
+          )}
+
+          {error && (
+            <div style={{ background:"#450a0a", border:"1px solid #ef4444", borderRadius:10, padding:"12px 14px", marginBottom:14, color:"#fca5a5", fontSize:13 }}>
+              ⚠ {error}
+            </div>
+          )}
+
+          {draft && (
+            <div style={{ background:"#1e293b", border:"1px solid #334155", borderRadius:14, padding:"14px", marginBottom:14 }}>
+              <div style={{ fontSize:13, fontWeight:700, color:"#38bdf8", marginBottom:12 }}>✅ Données extraites — vérifiez et éditez</div>
+              {[
+                ["nom","Produit","text"],
+                ["dateFabrication","Date fabrication","date"],
+                ["dlc","DLC / DDM","date"],
+                ["lot","N° de lot","text"],
+                ["allergenes","Allergènes","text"],
+                ["responsable","Responsable","text"],
+                ["temperature","Température","text"],
+                ["poids","Poids","text"],
+              ].map(([key, label, type]) => (
+                <div key={key} style={{ marginBottom:10 }}>
+                  <div style={{ fontSize:11, color:"#64748b", fontWeight:600, marginBottom:3 }}>{label}</div>
+                  <input
+                    type={type}
+                    value={draft[key] || ""}
+                    onChange={(e) => setDraft({ ...draft, [key]: e.target.value })}
+                    style={{
+                      width:"100%", boxSizing:"border-box",
+                      background:"#0f172a", border:"1px solid #334155", color:"#f1f5f9",
+                      borderRadius:7, padding:"8px 10px", fontSize:13,
+                    }}
+                  />
+                </div>
+              ))}
+              <button
+                onClick={saveLabel}
+                style={{ width:"100%", padding:"12px 0", borderRadius:10, border:"none", background:"#22c55e", color:"#0f172a", fontWeight:700, fontSize:14, cursor:"pointer", marginTop:4 }}
+              >
+                💾 Sauvegarder dans le tableau
+              </button>
+            </div>
+          )}
+
+          {preview && (
+            <button
+              onClick={() => { setPreview(null); setB64(null); setExtracted(null); setDraft(null); setError(null); if (inputRef.current) inputRef.current.value=""; }}
+              style={{ width:"100%", padding:"10px 0", borderRadius:10, border:"1px solid #334155", background:"none", color:"#64748b", fontSize:13, cursor:"pointer" }}
+            >
+              🗑 Recommencer
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* ── VUE TABLEAU ── */}
+      {view === "table" && (
+        <div>
+          {labels.length === 0 ? (
+            <div style={{ textAlign:"center", padding:"60px 20px", color:"#475569" }}>
+              <div style={{ fontSize:52 }}>📷</div>
+              <p style={{ marginTop:16, fontSize:15, fontWeight:600, color:"#64748b" }}>Aucune étiquette scannée</p>
+              <p style={{ fontSize:13, marginTop:6 }}>Utilisez l'onglet Scanner pour photographier une étiquette</p>
+              <button onClick={() => setView("scan")} style={{ marginTop:16, padding:"10px 22px", borderRadius:10, border:"none", background:"#38bdf8", color:"#0f172a", fontWeight:700, fontSize:13, cursor:"pointer" }}>
+                📷 Scanner une étiquette
+              </button>
+            </div>
+          ) : (
+            <div>
+              {labels.map((l) => {
+                const status = dlcStatus(l.dlc);
+                return (
+                  <div key={l.id} style={{ background:"#1e293b", border:"1px solid #334155", borderRadius:12, padding:"12px 14px", marginBottom:10 }}>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:8, marginBottom:8 }}>
+                      <div style={{ fontWeight:700, fontSize:14, color:"#f1f5f9", flex:1 }}>{l.nom || "Produit inconnu"}</div>
+                      <button onClick={() => removeLabel(l.id)} style={{ background:"#450a0a", border:"1px solid #ef444444", color:"#fca5a5", borderRadius:6, padding:"3px 8px", fontSize:11, cursor:"pointer", flexShrink:0 }}>✕</button>
+                    </div>
+                    {status && <div style={{ marginBottom:8 }}>{dlcBadge(l.dlc)}</div>}
+                    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"4px 12px", fontSize:12 }}>
+                      {l.dlc && <div><span style={{ color:"#64748b" }}>DLC: </span><span style={{ color:"#f1f5f9" }}>{l.dlc}</span></div>}
+                      {l.lot && <div><span style={{ color:"#64748b" }}>Lot: </span><span style={{ color:"#f1f5f9" }}>{l.lot}</span></div>}
+                      {l.dateFabrication && <div><span style={{ color:"#64748b" }}>Fab.: </span><span style={{ color:"#f1f5f9" }}>{l.dateFabrication}</span></div>}
+                      {l.poids && <div><span style={{ color:"#64748b" }}>Poids: </span><span style={{ color:"#f1f5f9" }}>{l.poids}</span></div>}
+                      {l.temperature && <div><span style={{ color:"#64748b" }}>Temp.: </span><span style={{ color:"#f1f5f9" }}>{l.temperature}</span></div>}
+                      {l.responsable && <div><span style={{ color:"#64748b" }}>Resp.: </span><span style={{ color:"#f1f5f9" }}>{l.responsable}</span></div>}
+                    </div>
+                    {l.allergenes && (
+                      <div style={{ marginTop:8, padding:"6px 10px", background:"#422006", borderRadius:6, fontSize:12, color:"#fdba74" }}>
+                        ⚠ Allergènes: {l.allergenes}
+                      </div>
+                    )}
+                    <div style={{ marginTop:6, fontSize:11, color:"#334155" }}>
+                      Scanné le {new Date(l.scannedAt).toLocaleDateString("fr-FR", { day:"2-digit", month:"2-digit", year:"numeric", hour:"2-digit", minute:"2-digit" })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── MODAL CLÉ API ── */}
+      {showKeyModal && (
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.7)", zIndex:100, display:"flex", alignItems:"center", justifyContent:"center", padding:20 }}>
+          <div style={{ background:"#1e293b", border:"1px solid #334155", borderRadius:16, padding:24, width:"100%", maxWidth:380 }}>
+            <div style={{ fontSize:16, fontWeight:700, marginBottom:6 }}>🔑 Clé API Anthropic</div>
+            <div style={{ fontSize:12, color:"#64748b", marginBottom:16 }}>
+              Votre clé est stockée localement sur cet appareil uniquement.
+            </div>
+            <input
+              type="password"
+              placeholder="sk-ant-api03-..."
+              value={keyDraft}
+              onChange={(e) => setKeyDraft(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && keyDraft && saveKey()}
+              autoFocus
+              style={{ width:"100%", boxSizing:"border-box", background:"#0f172a", border:"1px solid #334155", color:"#f1f5f9", borderRadius:8, padding:"10px 12px", fontSize:13, marginBottom:14 }}
+            />
+            <div style={{ display:"flex", gap:10 }}>
+              <button onClick={() => setShowKeyModal(false)} style={{ flex:1, padding:"10px 0", borderRadius:8, border:"1px solid #334155", background:"none", color:"#64748b", cursor:"pointer", fontSize:13 }}>Annuler</button>
+              <button onClick={saveKey} disabled={!keyDraft} style={{ flex:2, padding:"10px 0", borderRadius:8, border:"none", background: keyDraft ? "#38bdf8" : "#1e293b", color: keyDraft ? "#0f172a" : "#475569", fontWeight:700, cursor: keyDraft ? "pointer" : "not-allowed", fontSize:13 }}>Enregistrer</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── APP ROOT ─────────────────────────────────────────────────────────────────
 const TABS = [
   { id: "dash", label: "Tableau", icon: "📊" },
   { id: "temp", label: "Temp.", icon: "🌡️" },
   { id: "trace", label: "Traça", icon: "📋" },
   { id: "photo", label: "Photos", icon: "📷" },
+  { id: "scan",  label: "Scan",   icon: "🏷️" },
 ];
 
 export default function App() {
@@ -651,6 +971,7 @@ export default function App() {
         {tab === "temp"  && <TempTab records={byType("temp")} onAdd={add} />}
         {tab === "trace" && <TraceTab records={byType("trace")} onAdd={add} onRemove={remove} />}
         {tab === "photo" && <PhotoTab records={byType("photo")} onAdd={add} onRemove={remove} />}
+        {tab === "scan"  && <PhotoLabelScreen />}
       </div>
 
       {/* Barre de navigation fixe */}
