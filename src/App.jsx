@@ -197,6 +197,49 @@ const css = `
   .tag.green { background: ${theme.accentDim}; color: ${theme.accent}; }
   .tag.red { background: ${theme.dangerDim}; color: ${theme.danger}; }
   .tag.yellow { background: ${theme.warningDim}; color: ${theme.warning}; }
+
+  /* Range Poker Game */
+  .poker-screen { padding: 0 12px; }
+  .poker-scenario-card { background: ${theme.card}; border: 1px solid ${theme.border}; border-radius: 16px; padding: 16px; margin-bottom: 14px; }
+  .poker-position { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .poker-pos-badge { background: linear-gradient(135deg, #FFB547, #FF8C00); color: #000; font-size: 13px; font-weight: 800; padding: 4px 12px; border-radius: 20px; }
+  .poker-action-label { font-size: 12px; color: ${theme.textMuted}; }
+  .poker-context { font-size: 11px; color: ${theme.textDim}; font-family: 'JetBrains Mono'; }
+  .poker-instruction { font-size: 13px; color: ${theme.text}; font-weight: 500; margin-top: 8px; }
+  .poker-grid-wrap { overflow-x: auto; margin-bottom: 14px; }
+  .poker-grid { display: grid; grid-template-columns: repeat(13, 1fr); gap: 2px; min-width: 300px; }
+  .poker-cell { aspect-ratio: 1; border-radius: 4px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 8px; font-weight: 700; font-family: 'JetBrains Mono'; border: 1px solid transparent; transition: all 0.1s; user-select: none; }
+  .poker-cell.pair { background: #2A2040; color: #9B7FFF; border-color: #3D2D7A33; }
+  .poker-cell.suited { background: #0D2A1F; color: #4DB88A; border-color: #00D4AA22; }
+  .poker-cell.offsuit { background: #1A1F2A; color: ${theme.textDim}; border-color: ${theme.border}33; }
+  .poker-cell.selected.pair { background: #5B3FCC; color: #fff; border-color: #9B7FFF; }
+  .poker-cell.selected.suited { background: #006B40; color: #fff; border-color: #00D4AA; }
+  .poker-cell.selected.offsuit { background: #004080; color: #fff; border-color: #5BA3FF; }
+  .poker-cell.correct { background: #00D4AA33; border-color: #00D4AA; color: #00D4AA; }
+  .poker-cell.wrong { background: #FF4D6D33; border-color: #FF4D6D; color: #FF4D6D; }
+  .poker-cell.missed { background: #FFB54733; border-color: #FFB547; color: #FFB547; }
+  .poker-validate-btn { background: linear-gradient(135deg, #FFB547, #FF8C00); color: #000; border: none; border-radius: 14px; padding: 16px; font-family: 'Sora', sans-serif; font-size: 15px; font-weight: 800; width: 100%; cursor: pointer; margin-bottom: 10px; transition: all 0.15s; }
+  .poker-validate-btn:active { transform: scale(0.97); }
+  .poker-validate-btn:disabled { opacity: 0.5; cursor: default; }
+  .poker-clear-btn { background: ${theme.card}; color: ${theme.textMuted}; border: 1px solid ${theme.border}; border-radius: 14px; padding: 12px; font-family: 'Sora', sans-serif; font-size: 14px; width: 100%; cursor: pointer; margin-bottom: 14px; }
+  .poker-result-card { background: ${theme.card}; border-radius: 16px; padding: 16px; margin-bottom: 14px; border: 1px solid ${theme.border}; }
+  .poker-score-circle { width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-direction: column; margin: 0 auto 12px; }
+  .poker-stats-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 12px; }
+  .poker-stat { background: ${theme.surface}; border-radius: 10px; padding: 10px; text-align: center; }
+  .poker-stat-val { font-size: 18px; font-weight: 700; font-family: 'JetBrains Mono'; }
+  .poker-stat-lbl { font-size: 10px; color: ${theme.textMuted}; margin-top: 2px; }
+  .poker-tip { background: #5BA3FF15; border: 1px solid #5BA3FF33; border-radius: 12px; padding: 12px; margin-bottom: 14px; font-size: 12px; color: #5BA3FF; line-height: 1.5; }
+  .poker-legend { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+  .poker-legend-item { display: flex; align-items: center; gap: 5px; font-size: 10px; color: ${theme.textMuted}; }
+  .poker-legend-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+  .poker-menu-card { background: ${theme.card}; border: 1px solid ${theme.border}; border-radius: 16px; padding: 18px; margin-bottom: 10px; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; gap: 14px; }
+  .poker-menu-card:active { transform: scale(0.98); border-color: #FFB54766; }
+  .poker-menu-icon { font-size: 32px; }
+  .poker-menu-info { flex: 1; }
+  .poker-menu-name { font-size: 15px; font-weight: 700; margin-bottom: 3px; }
+  .poker-menu-desc { font-size: 12px; color: ${theme.textMuted}; }
+  .poker-menu-arr { font-size: 18px; color: ${theme.textDim}; }
+  .poker-total-banner { background: linear-gradient(135deg, #FFB54722, #FF8C0022); border: 1px solid #FFB54744; border-radius: 14px; padding: 14px 16px; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; }
 `;
 
 // ─── DATA ─────────────────────────────────────────────────────────────────────
@@ -545,6 +588,306 @@ function TraceScreen() {
   );
 }
 
+// ─── RANGE POKER GAME ────────────────────────────────────────────────────────
+
+const RANKS = ['A','K','Q','J','T','9','8','7','6','5','4','3','2'];
+
+function getHandName(i, j) {
+  if (i === j) return RANKS[i] + RANKS[i];
+  if (i < j) return RANKS[i] + RANKS[j] + 's';
+  return RANKS[j] + RANKS[i] + 'o';
+}
+
+function getCellType(i, j) {
+  if (i === j) return 'pair';
+  if (i < j) return 'suited';
+  return 'offsuit';
+}
+
+const UTG_RANGE = new Set([
+  'AA','KK','QQ','JJ','TT','99','88','77',
+  'AKs','AQs','AJs','ATs','A9s','A8s','A5s','A4s','A3s',
+  'KQs','KJs','KTs','QJs','QTs','JTs','T9s','98s','87s','76s','65s','54s',
+  'AKo','AQo','AJo','KQo',
+]);
+
+const CO_RANGE = new Set([
+  'AA','KK','QQ','JJ','TT','99','88','77','66','55','44','33','22',
+  'AKs','AQs','AJs','ATs','A9s','A8s','A7s','A6s','A5s','A4s','A3s','A2s',
+  'KQs','KJs','KTs','K9s','QJs','QTs','Q9s','JTs','J9s','T9s','T8s',
+  '98s','97s','87s','86s','76s','75s','65s','64s','54s','53s','43s',
+  'AKo','AQo','AJo','ATo','KQo','KJo','KTo','QJo','QTo','JTo',
+]);
+
+const BTN_RANGE = new Set([
+  'AA','KK','QQ','JJ','TT','99','88','77','66','55','44','33','22',
+  'AKs','AQs','AJs','ATs','A9s','A8s','A7s','A6s','A5s','A4s','A3s','A2s',
+  'KQs','KJs','KTs','K9s','K8s','K7s','K6s',
+  'QJs','QTs','Q9s','Q8s','Q7s',
+  'JTs','J9s','J8s','J7s',
+  'T9s','T8s','T7s','T6s',
+  '98s','97s','96s','95s',
+  '87s','86s','85s','84s',
+  '76s','75s','74s','73s',
+  '65s','64s','63s','54s','53s','52s','43s','42s','32s',
+  'AKo','AQo','AJo','ATo','A9o','A8o','A7o','A6o','A5o',
+  'KQo','KJo','KTo','K9o','K8o',
+  'QJo','QTo','Q9o','Q8o',
+  'JTo','J9o','J8o',
+  'T9o','T8o','98o','97o','87o','86o','76o','75o','65o',
+]);
+
+const POKER_SCENARIOS = [
+  {
+    id: 1,
+    position: 'UTG',
+    posIcon: '🎯',
+    action: 'Open raise 2.5x',
+    context: '6-max · 100BB · Blindes 250/500',
+    range: UTG_RANGE,
+    tip: 'UTG (Under The Gun) est la position la plus défavorable. Jouez uniquement vos mains les plus solides : paires moyennes+, broadways assortis, et quelques connecteurs premium.',
+    color: '#FF4D6D',
+  },
+  {
+    id: 2,
+    position: 'CO',
+    posIcon: '⚡',
+    action: 'Open raise 2.5x',
+    context: '6-max · 100BB · Blindes 250/500',
+    range: CO_RANGE,
+    tip: 'Cutoff (CO) offre un avantage positionnel important. Élargissez votre range : toutes les paires, la plupart des axes assortis, connecteurs, et plus de broadways non-assortis.',
+    color: '#FFB547',
+  },
+  {
+    id: 3,
+    position: 'BTN',
+    posIcon: '🎰',
+    action: 'Open raise 2.5x',
+    context: '6-max · 100BB · Blindes 250/500',
+    range: BTN_RANGE,
+    tip: 'Button (BTN) = meilleure position ! Vous avez l\'avantage post-flop garanti. Ouvrez très large : ~45-50% des mains. Incluez les petits axes, connecteurs bas, et mains marginales.',
+    color: '#00D4AA',
+  },
+];
+
+function RangePokerScreen() {
+  const [phase, setPhase] = useState('menu');
+  const [scenarioIdx, setScenarioIdx] = useState(0);
+  const [selected, setSelected] = useState(new Set());
+  const [result, setResult] = useState(null);
+  const [scores, setScores] = useState([]);
+
+  const scenario = POKER_SCENARIOS[scenarioIdx];
+
+  function toggleHand(i, j) {
+    if (phase === 'result') return;
+    const hand = getHandName(i, j);
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(hand)) next.delete(hand);
+      else next.add(hand);
+      return next;
+    });
+  }
+
+  function validate() {
+    const correct = scenario.range;
+    let tp = 0, fp = 0, fn = 0;
+    for (const h of selected) {
+      if (correct.has(h)) tp++;
+      else fp++;
+    }
+    for (const h of correct) {
+      if (!selected.has(h)) fn++;
+    }
+    const prec = selected.size === 0 ? 0 : tp / selected.size;
+    const rec = correct.size === 0 ? 0 : tp / correct.size;
+    const f1 = (prec + rec === 0) ? 0 : 2 * prec * rec / (prec + rec);
+    const pct = Math.round(f1 * 100);
+    const res = { pct, tp, fp, fn, total: correct.size };
+    setResult(res);
+    setScores(s => [...s, pct]);
+    setPhase('result');
+  }
+
+  function startScenario(idx) {
+    setScenarioIdx(idx);
+    setSelected(new Set());
+    setResult(null);
+    setPhase('quiz');
+  }
+
+  function backToMenu() {
+    setSelected(new Set());
+    setResult(null);
+    setPhase('menu');
+  }
+
+  const avgScore = scores.length > 0 ? Math.round(scores.reduce((a,b)=>a+b,0)/scores.length) : null;
+
+  function getCellClass(i, j) {
+    const hand = getHandName(i, j);
+    const type = getCellType(i, j);
+    if (phase === 'result') {
+      const inCorrect = scenario.range.has(hand);
+      const inSelected = selected.has(hand);
+      if (inCorrect && inSelected) return `poker-cell correct`;
+      if (inSelected && !inCorrect) return `poker-cell wrong`;
+      if (inCorrect && !inSelected) return `poker-cell missed`;
+      return `poker-cell ${type}`;
+    }
+    return `poker-cell ${type}${selected.has(hand) ? ' selected' : ''}`;
+  }
+
+  const scoreColor = (pct) => pct >= 80 ? theme.accent : pct >= 60 ? theme.warning : theme.danger;
+
+  if (phase === 'menu') {
+    return (
+      <div className="screen">
+        <div className="poker-screen">
+          <div style={{padding:'4px 0 14px'}}>
+            <div style={{fontSize:13,color:theme.textMuted,marginBottom:4}}>W SERIES — 3 MILLION EVENT</div>
+            <div style={{fontSize:18,fontWeight:700}}>Entraînement Range</div>
+            <div style={{fontSize:12,color:theme.textDim,fontFamily:"'JetBrains Mono'",marginTop:2}}>No-Limit Hold'em · 6-max · 50 000 chips</div>
+          </div>
+
+          {avgScore !== null && (
+            <div className="poker-total-banner">
+              <div>
+                <div style={{fontSize:12,color:theme.textMuted}}>Score moyen</div>
+                <div style={{fontSize:22,fontWeight:800,color:scoreColor(avgScore),fontFamily:"'JetBrains Mono'"}}>{avgScore}%</div>
+              </div>
+              <div style={{textAlign:'right'}}>
+                <div style={{fontSize:12,color:theme.textMuted}}>{scores.length} exercice{scores.length>1?'s':''} fait{scores.length>1?'s':''}</div>
+                <div style={{fontSize:11,color:theme.textDim}}>Continuez à pratiquer !</div>
+              </div>
+            </div>
+          )}
+
+          <div style={{fontSize:12,color:theme.textMuted,marginBottom:10,fontWeight:600,textTransform:'uppercase',letterSpacing:'0.8px'}}>Choisir un scénario</div>
+
+          {POKER_SCENARIOS.map((s, idx) => (
+            <div key={s.id} className="poker-menu-card" onClick={() => startScenario(idx)}>
+              <div className="poker-menu-icon">{s.posIcon}</div>
+              <div className="poker-menu-info">
+                <div className="poker-menu-name" style={{color:s.color}}>{s.position} — {s.action}</div>
+                <div className="poker-menu-desc">{s.context}</div>
+                <div style={{fontSize:11,color:theme.textDim,marginTop:4}}>{s.range.size} mains dans la range correcte</div>
+              </div>
+              <div className="poker-menu-arr">›</div>
+            </div>
+          ))}
+
+          <div className="poker-tip" style={{marginTop:6}}>
+            💡 Sélectionnez les mains que vous joueriez dans la grille 13×13. Plus votre choix est proche de la range GTO, meilleur est votre score !
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="screen">
+      <div className="poker-screen">
+        <div className="poker-scenario-card">
+          <div className="poker-position">
+            <div className="poker-pos-badge" style={{background:`linear-gradient(135deg, ${scenario.color}, ${scenario.color}99)`}}>{scenario.position}</div>
+            <div>
+              <div style={{fontSize:13,fontWeight:600}}>{scenario.action}</div>
+              <div className="poker-context">{scenario.context}</div>
+            </div>
+          </div>
+          <div className="poker-instruction">
+            Sélectionnez toutes les mains que vous ouvririez depuis le {scenario.position}
+          </div>
+          {phase === 'quiz' && (
+            <div style={{marginTop:8,fontSize:12,color:theme.textDim}}>
+              {selected.size} main{selected.size>1?'s':''} sélectionnée{selected.size>1?'s':''}
+            </div>
+          )}
+        </div>
+
+        {phase === 'result' && (
+          <div className="poker-legend">
+            <div className="poker-legend-item"><div className="poker-legend-dot" style={{background:'#00D4AA'}}/> Correct</div>
+            <div className="poker-legend-item"><div className="poker-legend-dot" style={{background:'#FF4D6D'}}/> Erreur</div>
+            <div className="poker-legend-item"><div className="poker-legend-dot" style={{background:'#FFB547'}}/> Oublié</div>
+            <div className="poker-legend-item"><div className="poker-legend-dot" style={{background:theme.card}}/> Fold OK</div>
+          </div>
+        )}
+
+        <div className="poker-grid-wrap">
+          <div className="poker-grid">
+            {Array.from({length:13}, (_,i) =>
+              Array.from({length:13}, (_,j) => (
+                <div
+                  key={`${i}-${j}`}
+                  className={getCellClass(i, j)}
+                  onClick={() => toggleHand(i, j)}
+                  title={getHandName(i,j)}
+                >
+                  {getHandName(i,j).length <= 3 ? getHandName(i,j) : getHandName(i,j).slice(0,2)}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        {phase === 'quiz' && (
+          <>
+            <button className="poker-validate-btn" onClick={validate}>
+              Valider ma range ({selected.size} mains)
+            </button>
+            <button className="poker-clear-btn" onClick={() => setSelected(new Set())}>
+              Effacer la sélection
+            </button>
+          </>
+        )}
+
+        {phase === 'result' && result && (
+          <>
+            <div className="poker-result-card">
+              <div className="poker-score-circle" style={{border:`3px solid ${scoreColor(result.pct)}`, background:`${scoreColor(result.pct)}15`}}>
+                <div style={{fontSize:24,fontWeight:800,color:scoreColor(result.pct),fontFamily:"'JetBrains Mono'"}}>{result.pct}%</div>
+                <div style={{fontSize:10,color:theme.textMuted}}>Score F1</div>
+              </div>
+              <div style={{textAlign:'center',fontSize:14,fontWeight:600,marginBottom:4}}>
+                {result.pct >= 85 ? '🏆 Excellent !' : result.pct >= 70 ? '💪 Bien joué !' : result.pct >= 50 ? '📚 Continuez !' : '🎯 À retravailler'}
+              </div>
+              <div style={{textAlign:'center',fontSize:12,color:theme.textMuted,marginBottom:4}}>
+                Range correcte : {result.total} mains
+              </div>
+              <div className="poker-stats-row">
+                <div className="poker-stat">
+                  <div className="poker-stat-val" style={{color:theme.accent}}>{result.tp}</div>
+                  <div className="poker-stat-lbl">Corrects</div>
+                </div>
+                <div className="poker-stat">
+                  <div className="poker-stat-val" style={{color:theme.danger}}>{result.fp}</div>
+                  <div className="poker-stat-lbl">Erreurs</div>
+                </div>
+                <div className="poker-stat">
+                  <div className="poker-stat-val" style={{color:theme.warning}}>{result.fn}</div>
+                  <div className="poker-stat-lbl">Oubliés</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="poker-tip">💡 {scenario.tip}</div>
+
+            <button className="poker-validate-btn" onClick={() => startScenario(scenarioIdx)}>
+              Réessayer ce scénario
+            </button>
+            <button className="poker-clear-btn" onClick={backToMenu}>
+              ← Changer de scénario
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── APP ROOT ─────────────────────────────────────────────────────────────────
 export default function App() {
   const [screen, setScreen] = useState("home");
@@ -562,11 +905,13 @@ export default function App() {
     {id:"stock",icon:"📦",label:"Stocks"},
     {id:"label",icon:"🏷️",label:"Étiq."},
     {id:"trace",icon:"🔍",label:"Traça."},
+    {id:"poker",icon:"🃏",label:"Poker"},
   ];
 
   const screenTitles = {
     home:"Accueil", temp:"Températures", haccp:"Plan HACCP",
-    stock:"Gestion des stocks", label:"Étiquetage", trace:"Traçabilité"
+    stock:"Gestion des stocks", label:"Étiquetage", trace:"Traçabilité",
+    poker:"Range Poker",
   };
 
   return (
@@ -596,6 +941,7 @@ export default function App() {
           {screen === "stock" && <StockScreen stock={stock}/>}
           {screen === "label" && <LabelScreen/>}
           {screen === "trace" && <TraceScreen/>}
+          {screen === "poker" && <RangePokerScreen/>}
         </div>
 
         <div className="bottom-nav">
