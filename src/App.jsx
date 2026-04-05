@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 // ─── DESIGN SYSTEM ───────────────────────────────────────────────────────────
 const theme = {
@@ -197,6 +197,16 @@ const css = `
   .tag.green { background: ${theme.accentDim}; color: ${theme.accent}; }
   .tag.red { background: ${theme.dangerDim}; color: ${theme.danger}; }
   .tag.yellow { background: ${theme.warningDim}; color: ${theme.warning}; }
+
+  /* Photo */
+  .photo-capture-btn { width: 100%; padding: 13px; background: ${theme.accentDim}; border: 1px dashed ${theme.accent}66; border-radius: 12px; color: ${theme.accent}; font-family: 'Sora', sans-serif; font-size: 14px; font-weight: 500; cursor: pointer; margin-bottom: 10px; display: flex; align-items: center; justify-content: center; gap: 8px; }
+  .photo-capture-btn:active { background: ${theme.accent}33; }
+  .photo-thumb { width: 44px; height: 44px; object-fit: cover; border-radius: 8px; cursor: pointer; border: 2px solid ${theme.accent}44; flex-shrink: 0; }
+  .photo-viewer-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.92); z-index: 200; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
+  .photo-viewer-overlay img { max-width: 100%; max-height: 75vh; border-radius: 12px; object-fit: contain; }
+  .photo-viewer-close { position: absolute; top: 52px; right: 20px; background: rgba(255,255,255,0.15); border: none; color: white; width: 38px; height: 38px; border-radius: 50%; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .task-photo-btn { background: transparent; border: 1px solid ${theme.border}; border-radius: 8px; padding: 5px 8px; color: ${theme.textMuted}; font-size: 15px; cursor: pointer; flex-shrink: 0; line-height: 1; }
+  .task-photo-btn.has-photo { border-color: ${theme.accent}66; color: ${theme.accent}; }
 `;
 
 // ─── DATA ─────────────────────────────────────────────────────────────────────
@@ -242,6 +252,16 @@ const CheckIcon = () => (
     <path d="M1 5L4.5 8.5L11 1.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
   </svg>
 );
+
+// ─── SHARED: Photo Viewer ─────────────────────────────────────────────────────
+function PhotoViewer({ src, onClose }) {
+  return (
+    <div className="photo-viewer-overlay" onClick={onClose}>
+      <button className="photo-viewer-close" onClick={onClose}>✕</button>
+      <img src={src} alt="Photo" onClick={e => e.stopPropagation()}/>
+    </div>
+  );
+}
 
 // ─── SCREENS ──────────────────────────────────────────────────────────────────
 
@@ -325,7 +345,9 @@ function HomeScreen({ temps, tasks, stock, onNavigate }) {
 
 function TempScreen({ temps, setTemps }) {
   const [showModal, setShowModal] = useState(false);
-  const [newTemp, setNewTemp] = useState({ name:"", zone:"", temp:"" });
+  const [newTemp, setNewTemp] = useState({ name:"", zone:"", temp:"", photo: null });
+  const [viewPhoto, setViewPhoto] = useState(null);
+  const photoRef = useRef(null);
 
   const getStatus = (t) => {
     if (t.temp < t.min || t.temp > t.max) return "bad";
@@ -333,14 +355,25 @@ function TempScreen({ temps, setTemps }) {
     return "ok";
   };
 
+  const handlePhoto = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => setNewTemp(prev => ({ ...prev, photo: ev.target.result }));
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
   const addReading = () => {
     if (!newTemp.name || !newTemp.temp) return;
     const val = parseFloat(newTemp.temp);
     setTemps(prev => [...prev, {
       id: Date.now(), name: newTemp.name, zone: newTemp.zone || "Cuisine",
-      temp: val, min: -2, max: 5, icon: "🌡️", time: new Date().toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"}), status:"ok"
+      temp: val, min: -2, max: 5, icon: "🌡️",
+      time: new Date().toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"}),
+      status:"ok", photo: newTemp.photo || null
     }]);
-    setNewTemp({ name:"", zone:"", temp:"" });
+    setNewTemp({ name:"", zone:"", temp:"", photo: null });
     setShowModal(false);
   };
 
@@ -357,10 +390,18 @@ function TempScreen({ temps, setTemps }) {
                 <div className="temp-zone">{t.zone}</div>
                 <div className="temp-range">Min {t.min}° / Max {t.max}°C</div>
               </div>
-              <div style={{textAlign:"right"}}>
+              <div style={{textAlign:"right",display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}}>
                 <div className={`temp-val ${s}`}>{t.temp > 0 ? "+" : ""}{t.temp}°C</div>
                 <div className="temp-time">{t.time}</div>
-                {s !== "ok" && <div className="tag" style={{marginTop:4, background: s==="bad"?"#FF4D6D22":"#FFB54722", color: s==="bad"?"#FF4D6D":"#FFB547", fontSize:10}}>{s==="bad"?"⚠️ Hors norme":"⚡ Limite"}</div>}
+                {s !== "ok" && <div className="tag" style={{marginTop:2, background: s==="bad"?"#FF4D6D22":"#FFB54722", color: s==="bad"?"#FF4D6D":"#FFB547", fontSize:10}}>{s==="bad"?"⚠️ Hors norme":"⚡ Limite"}</div>}
+                {t.photo && (
+                  <img
+                    src={t.photo}
+                    className="photo-thumb"
+                    alt="Relevé"
+                    onClick={() => setViewPhoto(t.photo)}
+                  />
+                )}
               </div>
             </div>
           );
@@ -378,11 +419,29 @@ function TempScreen({ temps, setTemps }) {
             <input className="modal-input" placeholder="Nom de l'équipement" value={newTemp.name} onChange={e=>setNewTemp({...newTemp,name:e.target.value})}/>
             <input className="modal-input" placeholder="Zone (ex: Cuisine, Réserve...)" value={newTemp.zone} onChange={e=>setNewTemp({...newTemp,zone:e.target.value})}/>
             <input className="modal-input" type="number" placeholder="Température (°C)" value={newTemp.temp} onChange={e=>setNewTemp({...newTemp,temp:e.target.value})}/>
+
+            <input ref={photoRef} type="file" accept="image/*" style={{display:"none"}} onChange={handlePhoto}/>
+            {newTemp.photo ? (
+              <div style={{position:"relative",marginBottom:10}}>
+                <img src={newTemp.photo} alt="Aperçu" style={{width:"100%",height:160,objectFit:"cover",borderRadius:12}}/>
+                <button
+                  onClick={() => setNewTemp({...newTemp, photo: null})}
+                  style={{position:"absolute",top:8,right:8,background:"rgba(0,0,0,0.6)",border:"none",color:"white",borderRadius:8,padding:"4px 10px",cursor:"pointer",fontSize:12}}
+                >✕ Supprimer</button>
+              </div>
+            ) : (
+              <button className="photo-capture-btn" onClick={() => photoRef.current.click()}>
+                📷 Ajouter une photo du relevé
+              </button>
+            )}
+
             <button className="modal-confirm" onClick={addReading}>✅ Enregistrer</button>
             <button className="modal-cancel" onClick={()=>setShowModal(false)}>Annuler</button>
           </div>
         </div>
       )}
+
+      {viewPhoto && <PhotoViewer src={viewPhoto} onClose={() => setViewPhoto(null)}/>}
     </div>
   );
 }
@@ -391,9 +450,32 @@ function HACCPScreen({ tasks, setTasks }) {
   const toggle = (id) => setTasks(prev => prev.map(t => t.id===id ? {...t, done:!t.done} : t));
   const doneCount = tasks.filter(t=>t.done).length;
   const pct = Math.round((doneCount/tasks.length)*100);
+  const [taskPhotos, setTaskPhotos] = useState({});
+  const [viewPhoto, setViewPhoto] = useState(null);
+  const photoRef = useRef(null);
+  const activeTaskId = useRef(null);
+
+  const openPhotoCapture = (e, taskId) => {
+    e.stopPropagation();
+    activeTaskId.current = taskId;
+    photoRef.current.click();
+  };
+
+  const handlePhoto = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setTaskPhotos(prev => ({ ...prev, [activeTaskId.current]: ev.target.result }));
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
 
   return (
     <div className="screen">
+      <input ref={photoRef} type="file" accept="image/*" style={{display:"none"}} onChange={handlePhoto}/>
+
       <div style={{padding:"0 16px 16px"}}>
         <div style={{background:theme.card,borderRadius:14,padding:"14px 16px",border:`1px solid ${theme.border}`}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
@@ -414,21 +496,32 @@ function HACCPScreen({ tasks, setTasks }) {
             <div key={freq}>
               <div style={{fontSize:12,fontWeight:600,color:theme.textMuted,paddingBottom:8,paddingTop:4,letterSpacing:"0.5px"}}>{labels[freq]}</div>
               {freqTasks.map(t => (
-                <div key={t.id} className={`task-item ${t.done?"done":""}`} onClick={()=>toggle(t.id)} style={{marginBottom:8}}>
-                  <div className={`task-check ${t.done?"checked":""}`}>
-                    {t.done && <CheckIcon/>}
+                <div key={t.id} style={{marginBottom:8}}>
+                  <div className={`task-item ${t.done?"done":""}`} onClick={()=>toggle(t.id)}>
+                    <div className={`task-check ${t.done?"checked":""}`}>
+                      {t.done && <CheckIcon/>}
+                    </div>
+                    <div className="task-info">
+                      <div className={`task-name ${t.done?"done":""}`}>{t.name}</div>
+                      <div className="task-meta">{t.who}</div>
+                    </div>
+                    <span className={`task-freq ${freq}`}>{freq}</span>
+                    <button
+                      className={`task-photo-btn ${taskPhotos[t.id] ? "has-photo" : ""}`}
+                      onClick={(e) => taskPhotos[t.id] ? (e.stopPropagation(), setViewPhoto(taskPhotos[t.id])) : openPhotoCapture(e, t.id)}
+                      title={taskPhotos[t.id] ? "Voir la photo" : "Prendre une photo"}
+                    >
+                      {taskPhotos[t.id] ? "🖼️" : "📷"}
+                    </button>
                   </div>
-                  <div className="task-info">
-                    <div className={`task-name ${t.done?"done":""}`}>{t.name}</div>
-                    <div className="task-meta">{t.who}</div>
-                  </div>
-                  <span className={`task-freq ${freq}`}>{freq}</span>
                 </div>
               ))}
             </div>
           );
         })}
       </div>
+
+      {viewPhoto && <PhotoViewer src={viewPhoto} onClose={() => setViewPhoto(null)}/>}
     </div>
   );
 }
